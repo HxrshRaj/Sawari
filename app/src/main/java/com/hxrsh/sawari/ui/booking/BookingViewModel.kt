@@ -99,7 +99,7 @@ class BookingViewModel @Inject constructor(
     }
 
     private fun initialState(): BookingState {
-        // Next whole hour, at least an hour away.
+        // Now + 1h, truncated to the hour: a sensible default that is still in the future.
         val first = LocalDateTime.now(clock).plusHours(1).truncatedTo(ChronoUnit.HOURS)
         return BookingState(zone = clock.zone, startDate = first.toLocalDate(), startTime = first.toLocalTime())
     }
