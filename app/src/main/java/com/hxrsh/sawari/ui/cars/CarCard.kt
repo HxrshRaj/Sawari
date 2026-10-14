@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -30,16 +29,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Precision
 import coil.size.Size
 import com.hxrsh.sawari.domain.model.Car
 import com.hxrsh.sawari.ui.common.formatPrice
 
 /** Decode at (at most) the size it is shown, not at the photo's native resolution. */
 @Composable
-fun rememberCarImageRequest(url: String, widthPx: Int = 640, heightPx: Int = 400): ImageRequest {
+fun rememberCarImageRequest(url: String, widthPx: Int = 540, heightPx: Int = 340): ImageRequest {
     val context = LocalContext.current
     return remember(url, widthPx, heightPx) {
-        ImageRequest.Builder(context).data(url).size(Size(widthPx, heightPx)).build()
+        ImageRequest.Builder(context).data(url).size(Size(widthPx, heightPx)).precision(Precision.INEXACT).build()
     }
 }
 
@@ -52,7 +52,7 @@ fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
             model = rememberCarImageRequest(car.imageUrl),
             contentDescription = car.name,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(180.dp).clip(MaterialTheme.shapes.medium),
+            modifier = Modifier.fillMaxWidth().height(180.dp), // the Card already clips its children; a second clip forces an offscreen layer per item
         )
         Row(
             Modifier.fillMaxWidth().padding(12.dp),

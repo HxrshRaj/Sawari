@@ -48,7 +48,7 @@ class StartupBenchmark {
         metrics = listOf(StartupTimingMetric()),
         compilationMode = mode,
         startupMode = StartupMode.COLD,
-        iterations = 10,
+        iterations = 6,
         setupBlock = { signInIfNeeded(); killProcess() },
     ) { startCarList() }
 
@@ -69,7 +69,7 @@ class ListBenchmark {
         ),
         compilationMode = mode,
         startupMode = StartupMode.WARM,
-        iterations = 10,
+        iterations = 6,
         setupBlock = { signInIfNeeded(); killProcess(); startCarList(naive) },
     ) {
         val list = device.findObject(By.res("car_list"))
@@ -87,7 +87,7 @@ class ListBenchmark {
         metrics = listOf(TraceSectionMetric("CarCard", TraceSectionMetric.Mode.Sum)),
         compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
         startupMode = StartupMode.WARM,
-        iterations = 8,
+        iterations = 5,
         setupBlock = { signInIfNeeded(); killProcess(); startCarList(naive) },
     ) {
         for (city in listOf("Bengaluru", "Mumbai", "Delhi", "Delhi")) {
