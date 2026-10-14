@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+# Android
+*.iml
+.gradle/
+build/
+/local.properties
+.idea/
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+google-services.json
+keystore.properties
+*.jks
+*.keystore
