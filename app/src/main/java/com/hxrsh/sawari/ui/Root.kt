@@ -17,11 +17,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -72,10 +76,12 @@ object Routes {
     fun booking(id: Int) = "book/$id"
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SawariRoot(viewModel: MainViewModel = hiltViewModel()) {
     val session by viewModel.sessionState.collectAsStateWithLifecycle()
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    // Expose testTags as resource-ids so uiautomator/adb scripts can drive the real app.
+    Surface(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }, color = MaterialTheme.colorScheme.background) {
         when (session) {
             SessionState.Loading -> Box(Modifier.fillMaxSize())
             SessionState.LoggedOut -> AuthScreen()
@@ -104,13 +110,7 @@ private fun MainNav() {
                     tabs.forEach { tab ->
                         NavigationBarItem(
                             selected = destination?.hierarchy?.any { it.route == tab.route } == true,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { navController.navigateToTab(tab.route) },
                             icon = { Icon(tab.icon, contentDescription = null) },
                             label = { Text(tab.label) },
                             modifier = Modifier.testTag("tab_${tab.route}"),
@@ -139,13 +139,19 @@ private fun MainNav() {
                 BookingScreen(
                     onBack = { navController.popBackStack() },
                     onBooked = {
-                        navController.navigate(Routes.BOOKINGS) {
-                            popUpTo(Routes.CARS)
-                            launchSingleTop = true
-                        }
+                        navController.popBackStack(Routes.CARS, inclusive = false)
+                        navController.navigateToTab(Routes.BOOKINGS)
                     },
                 )
             }
         }
+    }
+}
+
+private fun NavController.navigateToTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
