@@ -69,7 +69,7 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfigs.findByName("release")?.let { signingConfig = it }
-            buildConfigField("String", "BASE_URL", "\"${prop("sawari.releaseBaseUrl", prop("sawari.baseUrl", "https://sawari-api.onrender.com/"))}\"")
+            buildConfigField("String", "BASE_URL", "\"${prop("sawari.releaseBaseUrl", prop("sawari.baseUrl", "https://sawari-api-1krd.onrender.com/"))}\"")
         }
         // Release-like build signed with the debug key, used for Macrobenchmark on emulators/devices.
         create("benchmark") {

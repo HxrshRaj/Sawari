@@ -4,7 +4,7 @@ Browse cars in a city, pick a time slot, book, and see/cancel your bookings. A n
 
 | | |
 |---|---|
-| Live API docs | _pending: see [Deploying the backend](#deploying-the-backend-render); needs the owner's Render account_ |
+| Live API docs | https://sawari-api-1krd.onrender.com/docs (Render free tier: the first request after idle can take ~30 s) |
 | Debug APK | built by CI on every push, attached to the GitHub release on `v*` tags |
 | Tests | 44 JVM unit tests + 6 emulator UI tests + 10 backend tests (60) |
 
@@ -145,10 +145,10 @@ keyPassword=...
 Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-SERVICE.onrender.com/`. Without a keystore the release APK builds unsigned (`app-lite-release-unsigned.apk`, verified). Listing text, data-safety answers and the privacy policy are in [`store/`](store). **Publishing needs the owner's Google Play developer account (one-time fee), so I stopped before that step.**
 
 ## Deploying the backend (Render)
-`render.yaml` is a Blueprint: a Docker web service (`backend/Dockerfile`) plus a free Postgres, with `DATABASE_URL` wired in and a generated `JWT_SECRET`. In Render: *New → Blueprint → pick this repo*. The public docs URL will be `https://<service>.onrender.com/docs`. I verified the Docker image locally (builds, boots two workers, creates the schema, seeds 24 cars, serves `/docs`, accepts a `postgres://` URL); I have **not** deployed it because that needs your Render account.
+`render.yaml` is a Blueprint: a Docker web service (`backend/Dockerfile`) plus a free Postgres, with `DATABASE_URL` wired in and a generated `JWT_SECRET`. In Render: *New → Blueprint → pick this repo*. The public docs URL will be `https://<service>.onrender.com/docs`. Deployed at https://sawari-api-1krd.onrender.com. I curl-tested the live service: `/health`, 24 cars in 3 cities, register, book, the same booking again (`409`), cancel.
 
 ## Honest limits
-- **Not deployed yet.** There is no live URL, because I have no access to a Render or GitHub account from here. Everything below was verified against the backend running locally.
+- **Free-tier hosting:** the Render service sleeps when idle (slow first request) and the free Postgres is time-limited. The emulator walkthrough, offline test and benchmarks were run against a local backend, not the Render one.
 - **No real payments**, no real fleet. Prices are illustrative INR; total = hours x hourly rate.
 - **Car photos are stock images reused across the catalogue** (9 photos, 24 cars) and do not match the car names.
 - **Firebase Crashlytics/Analytics are integrated and compile, but I never saw an event or crash in a Firebase console** (no Firebase project is available to me). The `firebase` flavour is therefore unverified end to end.
