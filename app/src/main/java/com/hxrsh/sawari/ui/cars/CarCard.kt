@@ -1,5 +1,6 @@
 package com.hxrsh.sawari.ui.cars
 
+import android.os.Trace
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +45,8 @@ fun rememberCarImageRequest(url: String, widthPx: Int = 640, heightPx: Int = 400
 
 @Composable
 fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
+    // Trace section so Macrobenchmark can count how many times a card body actually runs (see README).
+    Trace.beginSection("CarCard")
     Card(onClick = { onClick(car.id) }, modifier = modifier.fillMaxWidth().testTag("car_card_${car.id}")) {
         AsyncImage(
             model = rememberCarImageRequest(car.imageUrl),
@@ -71,6 +74,7 @@ fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
             )
         }
     }
+    Trace.endSection()
 }
 
 @Composable

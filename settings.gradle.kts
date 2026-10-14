@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Sawari"
 include(":app")
+include(":benchmark")

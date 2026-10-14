@@ -77,6 +77,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
             isDebuggable = false
+            buildConfigField("String", "BASE_URL", "\"${prop("sawari.baseUrl", "http://10.0.2.2:8000/")}\"")
         }
     }
 

@@ -1,5 +1,7 @@
 package com.hxrsh.sawari.ui.cars
 
+import android.app.Activity
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,6 +25,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
@@ -41,7 +45,11 @@ private val FUELS = listOf("Petrol", "Diesel", "Electric", "CNG")
 @Composable
 fun CarListScreen(onCarClick: (Int) -> Unit, viewModel: CarListViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val activity = LocalContext.current as? Activity
+    // Benchmark-only switch: `am start --ez naive_list true` renders the deliberately naive list.
+    val naive = remember { activity?.intent?.getBooleanExtra("naive_list", false) == true }
     CarListContent(
+        naive = naive,
         state = state,
         onQueryChange = viewModel::onQueryChange,
         onCityChange = viewModel::onCityChange,
@@ -62,7 +70,10 @@ fun CarListContent(
     onRefresh: () -> Unit,
     onCarClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    naive: Boolean = false,
 ) {
+    // Tells the system (and Macrobenchmark's timeToFullDisplay) when real content is on screen.
+    ReportDrawnWhen { state.content is UiState.Content || state.content is UiState.Empty }
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(
             value = state.filter.query,
@@ -94,7 +105,7 @@ fun CarListContent(
                 UiState.Loading -> LoadingState()
                 UiState.Empty -> EmptyState("No cars found", "Try a different search or clear the filters.")
                 is UiState.Error -> ErrorState(content.message, onRetry = onRefresh)
-                is UiState.Content -> CarList(content.data, onCarClick)
+                is UiState.Content -> if (naive) NaiveCarList(content.data, onCarClick) else CarList(content.data, onCarClick)
             }
         }
     }
