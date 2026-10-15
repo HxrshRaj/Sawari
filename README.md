@@ -147,6 +147,14 @@ Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-
 ## Deploying the backend (Render)
 `render.yaml` is a Blueprint: a Docker web service (`backend/Dockerfile`) plus a free Postgres, with `DATABASE_URL` wired in and a generated `JWT_SECRET`. In Render: *New → Blueprint → pick this repo*. The public docs URL will be `https://<service>.onrender.com/docs`. Deployed at https://sawari-api-1krd.onrender.com. I curl-tested the live service: `/health`, 24 cars in 3 cities, register, book, the same booking again (`409`), cancel.
 
+## Quality
+| Area | Status | Where |
+|---|---|---|
+| Accessibility | **Done and run**: automated Compose accessibility checks and 48dp touch-target assertions on all 5 screens, 200% font-scale fixes, contrast fixes, screen-reader focus order. TalkBack by ear **not run** | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) |
+| Crash analysis with Crashlytics | **Not run.** Needs a real Firebase project and `google-services.json` | n/a |
+| Figma to Compose | **Not done** | n/a |
+| Device / OS-version matrix | **Not run.** Only an Android 14 emulator has been used | n/a |
+
 ## Honest limits
 - **Free-tier hosting:** the Render service sleeps when idle (slow first request) and the free Postgres is time-limited. The emulator walkthrough, offline test and benchmarks were run against a local backend, not the Render one.
 - **No real payments**, no real fleet. Prices are illustrative INR; total = hours x hourly rate.
