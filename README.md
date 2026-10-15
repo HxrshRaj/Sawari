@@ -155,6 +155,11 @@ Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-
 | Figma to Compose | **Not done** | n/a |
 | Device / OS-version matrix | **Not run.** Only an Android 14 emulator has been used | n/a |
 
+## Future scope
+- **iOS (SwiftUI) client**, not started. The architecture was kept portable on purpose: the FastAPI backend is client-agnostic, the domain layer (models, `AppResult`/`AppError`, use cases) has no Android types, and the unidirectional-state ViewModels map onto SwiftUI view models (`@Observable`, `async/await` in place of `Flow`, SwiftData/Core Data in place of Room as the offline source of truth). Needs a Mac to build.
+- Crashlytics end-to-end verification against a real Firebase project, a Figma-to-Compose design pass, and a real-device / multi-OS-version test matrix (see the Quality table above).
+- Encrypted token storage, pagination, and real payments.
+
 ## Honest limits
 - **Free-tier hosting:** the Render service sleeps when idle (slow first request) and the free Postgres is time-limited. The emulator walkthrough, offline test and benchmarks were run against a local backend, not the Render one.
 - **No real payments**, no real fleet. Prices are illustrative INR; total = hours x hourly rate.
