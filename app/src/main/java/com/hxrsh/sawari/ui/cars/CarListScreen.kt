@@ -78,7 +78,7 @@ fun CarListContent(
         OutlinedTextField(
             value = state.filter.query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Search cars") },
+            label = { Text("Search cars") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (state.filter.query.isNotEmpty()) {

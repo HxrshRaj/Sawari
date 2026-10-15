@@ -1,5 +1,25 @@
 package com.hxrsh.sawari
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.tryPerformAccessibilityChecks
+import androidx.compose.ui.unit.dp
+import com.hxrsh.sawari.domain.model.TimeSlot
+import com.hxrsh.sawari.ui.booking.BookingContent
+import com.hxrsh.sawari.ui.booking.BookingState
+import com.hxrsh.sawari.ui.bookings.BookingsState
+import com.hxrsh.sawari.ui.bookings.MyBookingsContent
+import com.hxrsh.sawari.ui.detail.CarDetailContent
+import com.hxrsh.sawari.ui.detail.CarDetailState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -18,7 +38,9 @@ import com.hxrsh.sawari.ui.cars.CarListContent
 import com.hxrsh.sawari.ui.cars.CarListState
 import com.hxrsh.sawari.ui.common.UiState
 import com.hxrsh.sawari.ui.theme.SawariTheme
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,6 +118,81 @@ class ComposeUiTest {
         rule.onNodeWithTag("cancel_5").performClick()
         assertEquals(1, cancelRequests)
         rule.onNodeWithTag("cancel_6").assertDoesNotExist()
-        rule.onNodeWithTag("status_6").assertTextContains("Cancelled")
+        rule.onNodeWithTag("booking_card_6").assertContentDescriptionContains("Cancelled", substring = true)
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Accessibility: automated Compose accessibility checks (contrast, touch target size, labels, ...)
+    // plus explicit assertions. Runs the same checks on every screen.
+    // ---------------------------------------------------------------------------------------------
+
+    private val busy = listOf(TimeSlot(Instant.now().plusSeconds(7200), Instant.now().plusSeconds(18000)))
+    private val upcoming = Booking(5, swift, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 540, BookingStatus.CONFIRMED)
+
+    /** Real touch-target check: Material widgets enlarge their touch area beyond their layout bounds, so measure that. */
+    private fun assertTargets(vararg tags: String) {
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        tags.forEach { tag ->
+            val b = rule.onNodeWithTag(tag).fetchSemanticsNode().touchBoundsInRoot
+            assertTrue("$tag touch target is ${b.width / density}x${b.height / density}dp, need 48x48", b.width / density >= 47.5f && b.height / density >= 47.5f)
+        }
+    }
+
+    private fun isHeading() = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun a11y_carList() {
+        rule.enableAccessibilityChecks()
+        setList(CarListState(content = UiState.Content(listOf(swift, nexon)), cities = listOf("Bengaluru", "Mumbai")))
+        rule.onRoot().tryPerformAccessibilityChecks()
+        // A card is ONE focusable element that reads name, place, seats, fuel and price.
+        rule.onNodeWithTag("car_card_1").assertContentDescriptionContains("Maruti Swift", substring = true).assertContentDescriptionContains("180", substring = true)
+        rule.onNodeWithTag("car_card_1").assertHasClickAction()
+        assertTargets("car_card_1", "city_chip_Bengaluru", "fuel_chip_Petrol", "search_field")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun a11y_carDetail() {
+        rule.enableAccessibilityChecks()
+        rule.setContent { SawariTheme { CarDetailContent(CarDetailState(UiState.Content(swift), busy), {}, {}) } }
+        rule.onRoot().tryPerformAccessibilityChecks()
+        rule.onNodeWithContentDescription("Back").assertIsDisplayed()
+        rule.onNode(isHeading() and hasText("Maruti Swift")).assertExists()
+        assertTargets("back_button", "book_button")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun a11y_booking() {
+        rule.enableAccessibilityChecks()
+        val start = java.time.LocalDate.now().plusDays(1)
+        val state = BookingState(car = swift, startDate = start, startTime = java.time.LocalTime.of(10, 0), busy = busy, error = "Taken", conflict = true)
+        rule.setContent { SawariTheme { BookingContent(state, androidx.compose.material3.SnackbarHostState(), {}, {}) } }
+        rule.onRoot().tryPerformAccessibilityChecks()
+        rule.onNodeWithContentDescription("Fewer hours").assertIsDisplayed()
+        rule.onNodeWithContentDescription("More hours").assertIsDisplayed()
+        rule.onNode(isHeading() and hasText("When do you need it?")).assertExists()
+        assertTargets("back_button", "pick_date", "pick_time", "duration_minus", "duration_plus", "confirm_button")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun a11y_myBookings() {
+        rule.enableAccessibilityChecks()
+        val state = BookingsState(content = UiState.Content(listOf(upcoming, upcoming.copy(id = 6, status = BookingStatus.CANCELLED))), now = Instant.now())
+        rule.setContent {
+            SawariTheme { MyBookingsContent(state, androidx.compose.material3.SnackbarHostState(), {}, {}, {}, showDebugMenu = false) }
+        }
+        rule.onRoot().tryPerformAccessibilityChecks()
+        rule.onNodeWithTag("booking_card_5").assertContentDescriptionContains("Confirmed", substring = true)
+        rule.onNodeWithTag("booking_card_6").assertContentDescriptionContains("Cancelled", substring = true)
+        rule.onNode(isHeading() and hasText("My bookings")).assertExists()
+        assertTargets("account_menu", "cancel_5")
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun a11y_auth() {
+        rule.enableAccessibilityChecks()
+        rule.setContent { SawariTheme { AuthContent(AuthState(error = "Enter a valid email address"), {}, {}, {}, {}, {}) } }
+        rule.onRoot().tryPerformAccessibilityChecks()
+        assertTargets("email_field", "password_field", "submit_button", "toggle_mode")
     }
 }

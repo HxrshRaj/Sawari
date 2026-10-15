@@ -1,0 +1,6 @@
+1. Sawari  [heading]
+2. Rent a car in minutes
+3. Email  [text field]
+4. Password  [text field]
+5. Sign in  [button, role=Button]
+6. New here? Create an account  [button, role=Button]

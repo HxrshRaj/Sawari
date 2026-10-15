@@ -1,5 +1,11 @@
 package com.hxrsh.sawari.ui.common
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +37,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Column(
-        modifier.fillMaxSize().testTag("loading_state"),
+        modifier.fillMaxSize().testTag("loading_state").semantics(mergeDescendants = true) { contentDescription = "Loading" },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -73,7 +79,7 @@ private fun CenteredMessage(
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.size(12.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.size(4.dp))
         Text(
             message,
@@ -90,7 +96,7 @@ private fun CenteredMessage(
 @Composable
 fun OfflineBanner(message: String, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth().testTag("offline_banner"),
+        modifier = modifier.fillMaxWidth().testTag("offline_banner").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         color = MaterialTheme.colorScheme.secondaryContainer,
         shape = RoundedCornerShape(12.dp),
     ) {
@@ -99,5 +105,23 @@ fun OfflineBanner(message: String, modifier: Modifier = Modifier) {
             Spacer(Modifier.width(8.dp))
             Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
+    }
+}
+
+/** A read-only label chip. (Material chips are buttons; a chip with a no-op click is announced as a dead button.) */
+@Composable
+fun InfoChip(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            softWrap = false,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }

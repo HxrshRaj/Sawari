@@ -1,0 +1,16 @@
+1. Back  [button, role=Button]
+2. Book a car
+3. Maruti Swift  [heading]
+4. When do you need it?  [heading]
+5. Start date, Fri, 16 Oct 2026. Double tap to change  [button, role=Button]
+6. Start time, 10:00 AM. Double tap to change  [button, role=Button]
+7. Duration  [heading]
+8. Fewer hours  [button, role=Button]
+9. More hours  [button, role=Button]
+10. 3 hours  [live region]
+11. From  Fri, 16 Oct · 10:00 AM
+12. Until  Fri, 16 Oct · 1:00 PM
+13. Total ₹540
+14. Already booked  [heading]
+15. Fri, 16 Oct · 12:56 AM → Fri, 16 Oct · 3:56 AM
+16. Confirm booking  [button, role=Button]

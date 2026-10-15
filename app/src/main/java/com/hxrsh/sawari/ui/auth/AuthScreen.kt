@@ -1,5 +1,11 @@
 package com.hxrsh.sawari.ui.auth
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -63,7 +69,7 @@ fun AuthContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
-        Text("Sawari", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+        Text("Sawari", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { heading() })
         Text(
             if (state.registering) "Create your account" else "Rent a car in minutes",
             style = MaterialTheme.typography.bodyLarge,
@@ -102,14 +108,14 @@ fun AuthContent(
         )
         if (state.error != null) {
             Spacer(Modifier.height(8.dp))
-            Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("auth_error"))
+            Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("auth_error").semantics { liveRegion = LiveRegionMode.Assertive })
         }
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onSubmit, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().height(48.dp).testTag("submit_button")) {
+        Button(onClick = onSubmit, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("submit_button")) {
             if (state.isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
             else Text(if (state.registering) "Create account" else "Sign in")
         }
-        TextButton(onClick = onToggleMode, modifier = Modifier.testTag("toggle_mode")) {
+        TextButton(onClick = onToggleMode, modifier = Modifier.heightIn(min = 48.dp).testTag("toggle_mode")) {
             Text(if (state.registering) "Already have an account? Sign in" else "New here? Create an account")
         }
     }

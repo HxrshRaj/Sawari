@@ -1,5 +1,11 @@
 package com.hxrsh.sawari.ui.cars
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import android.os.Trace
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -47,10 +52,15 @@ fun rememberCarImageRequest(url: String, widthPx: Int = 540, heightPx: Int = 340
 fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
     // Trace section so Macrobenchmark can count how many times a card body actually runs (see README).
     Trace.beginSection("CarCard")
-    Card(onClick = { onClick(car.id) }, modifier = modifier.fillMaxWidth().testTag("car_card_${car.id}")) {
+    // One focus stop per card; TalkBack reads everything once instead of five separate fragments.
+    val summary = "${car.name}, ${car.city}, ${car.seats} seats, ${car.fuel}, ${formatPrice(car.pricePerHour)} per hour"
+    Card(
+        onClick = { onClick(car.id) },
+        modifier = modifier.fillMaxWidth().testTag("car_card_${car.id}").semantics(mergeDescendants = true) { contentDescription = summary },
+    ) {
         AsyncImage(
             model = rememberCarImageRequest(car.imageUrl),
-            contentDescription = car.name,
+            contentDescription = null, // decorative here: the card summary already names the car
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(180.dp), // the Card already clips its children; a second clip forces an offscreen layer per item
         )
@@ -60,7 +70,7 @@ fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(car.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(car.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Fact(Icons.Default.LocationOn, car.city)
                     Fact(Icons.Default.EventSeat, "${car.seats}")
@@ -70,6 +80,8 @@ fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
             Text(
                 formatPrice(car.pricePerHour) + "/hr",
                 style = MaterialTheme.typography.titleMedium,
+                softWrap = false,
+                modifier = Modifier.padding(start = 8.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
         }
@@ -80,7 +92,7 @@ fun CarCard(car: Car, onClick: (Int) -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun Fact(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+        Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(" $text", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

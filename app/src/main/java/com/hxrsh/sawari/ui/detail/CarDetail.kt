@@ -1,5 +1,12 @@
 package com.hxrsh.sawari.ui.detail
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,6 +46,7 @@ import com.hxrsh.sawari.domain.usecase.GetBusySlotsUseCase
 import com.hxrsh.sawari.domain.usecase.ObserveCarUseCase
 import com.hxrsh.sawari.ui.cars.rememberCarImageRequest
 import com.hxrsh.sawari.ui.common.EmptyState
+import com.hxrsh.sawari.ui.common.InfoChip
 import com.hxrsh.sawari.ui.common.LoadingState
 import com.hxrsh.sawari.ui.common.UiState
 import com.hxrsh.sawari.ui.common.formatDateTime
@@ -113,16 +120,16 @@ private fun DetailBody(car: Car, busy: List<TimeSlot>, onBook: (Int) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AsyncImage(
             model = rememberCarImageRequest(car.imageUrl, widthPx = 1080, heightPx = 640),
-            contentDescription = car.name,
+            contentDescription = null, // decorative: the heading below already names the car
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(240.dp),
         )
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(car.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("detail_name"))
+            Text(car.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("detail_name").semantics { heading() })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text(car.city) })
-                AssistChip(onClick = {}, label = { Text("${car.seats} seats") })
-                AssistChip(onClick = {}, label = { Text(car.fuel) })
+                InfoChip(car.city)
+                InfoChip("${car.seats} seats")
+                InfoChip(car.fuel)
             }
             Text(
                 "${formatPrice(car.pricePerHour)} per hour",
@@ -130,7 +137,7 @@ private fun DetailBody(car: Car, busy: List<TimeSlot>, onBook: (Int) -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
             )
             if (busy.isNotEmpty()) {
-                Text("Already booked", style = MaterialTheme.typography.titleSmall)
+                Text("Already booked", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
                 busy.take(5).forEach {
                     Text(
                         "${it.start.formatDateTime()} → ${it.end.formatDateTime()}",
@@ -140,7 +147,7 @@ private fun DetailBody(car: Car, busy: List<TimeSlot>, onBook: (Int) -> Unit) {
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Button(onClick = { onBook(car.id) }, modifier = Modifier.fillMaxWidth().height(48.dp).testTag("book_button")) {
+            Button(onClick = { onBook(car.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("book_button")) {
                 Text("Book this car")
             }
         }

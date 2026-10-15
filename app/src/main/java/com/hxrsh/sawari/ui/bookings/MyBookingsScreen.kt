@@ -1,5 +1,12 @@
 package com.hxrsh.sawari.ui.bookings
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +25,6 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,6 +58,7 @@ import com.hxrsh.sawari.domain.model.Booking
 import com.hxrsh.sawari.domain.model.BookingStatus
 import com.hxrsh.sawari.ui.common.EmptyState
 import com.hxrsh.sawari.ui.common.ErrorState
+import com.hxrsh.sawari.ui.common.InfoChip
 import com.hxrsh.sawari.ui.common.LoadingState
 import com.hxrsh.sawari.ui.common.OfflineBanner
 import com.hxrsh.sawari.ui.common.UiState
@@ -95,7 +102,7 @@ fun MyBookingsContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("My bookings", style = MaterialTheme.typography.headlineSmall)
+                Text("My bookings", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                 AccountMenu(onLogout, showDebugMenu, onDebugNonFatal, onDebugCrash)
             }
             if (state.staleNotice != null) {
@@ -146,7 +153,7 @@ private fun AccountMenu(onLogout: () -> Unit, showDebug: Boolean, onNonFatal: ()
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("account_menu")) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+            Icon(Icons.Default.MoreVert, contentDescription = "Account menu")
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
@@ -176,27 +183,33 @@ private fun AccountMenu(onLogout: () -> Unit, showDebug: Boolean, onNonFatal: ()
 @Composable
 fun BookingCard(booking: Booking, cancellable: Boolean, cancelling: Boolean, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     val cancelled = booking.status == BookingStatus.CANCELLED
+    val statusLabel = if (cancelled) "Cancelled" else "Confirmed"
+    val summary = "${booking.car.name}, ${booking.car.city}, ${booking.start.formatDateTime()} to ${booking.end.formatDateTime()}, " +
+        "${formatPrice(booking.totalPrice)}, $statusLabel"
     Card(
-        modifier = modifier.fillMaxWidth().testTag("booking_card_${booking.id}"),
+        modifier = modifier.fillMaxWidth().testTag("booking_card_${booking.id}")
+            .semantics(mergeDescendants = true) { contentDescription = summary; stateDescription = statusLabel },
         colors = CardDefaults.cardColors(
             containerColor = if (cancelled) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainer,
         ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(booking.car.name, style = MaterialTheme.typography.titleMedium)
-                AssistChip(
-                    onClick = {},
-                    label = { Text(if (cancelled) "Cancelled" else "Confirmed") },
-                    modifier = Modifier.testTag("status_${booking.id}"),
-                )
+                Text(booking.car.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
+                // never wraps: at 200% font scale a wrapping chip collapsed to one letter per line
+                InfoChip(statusLabel, modifier = Modifier.testTag("status_${booking.id}"))
             }
             Text(booking.car.city, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("${booking.start.formatDateTime()} → ${booking.end.formatDateTime()}", style = MaterialTheme.typography.bodyMedium)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(formatPrice(booking.totalPrice), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 if (cancellable) {
-                    OutlinedButton(onClick = onCancel, enabled = !cancelling, modifier = Modifier.testTag("cancel_${booking.id}")) {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        enabled = !cancelling,
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("cancel_${booking.id}")
+                            .semantics { contentDescription = "Cancel booking for ${booking.car.name}" },
+                    ) {
                         if (cancelling) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text("Cancel")
                     }
                 } else Spacer(Modifier.size(0.dp))

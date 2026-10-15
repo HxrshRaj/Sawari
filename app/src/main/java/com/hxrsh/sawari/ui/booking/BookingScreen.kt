@@ -1,5 +1,12 @@
 package com.hxrsh.sawari.ui.booking
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -97,7 +104,7 @@ fun BookingContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Book ${state.car?.name.orEmpty()}") },
+                title = { Text("Book a car") },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -111,21 +118,32 @@ fun BookingContent(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("When do you need it?", style = MaterialTheme.typography.titleMedium)
+            if (state.car != null) {
+                Text(state.car.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() }.testTag("booking_car_name"))
+            }
+            Text("When do you need it?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { showDate = true }, modifier = Modifier.weight(1f).testTag("pick_date")) {
+                OutlinedButton(
+                    onClick = { showDate = true },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("pick_date")
+                        .semantics(mergeDescendants = true) { contentDescription = "Start date, ${state.startDate.formatDate()}. Double tap to change" },
+                ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
                     Text(state.startDate.formatDate())
                 }
-                OutlinedButton(onClick = { showTime = true }, modifier = Modifier.testTag("pick_time")) {
+                OutlinedButton(
+                    onClick = { showTime = true },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("pick_time")
+                        .semantics(mergeDescendants = true) { contentDescription = "Start time, ${state.startTime.formatTime()}. Double tap to change" },
+                ) {
                     Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
                     Text(state.startTime.formatTime())
                 }
             }
 
-            Text("Duration", style = MaterialTheme.typography.titleMedium)
+            Text("Duration", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 FilledIconButton(
                     onClick = { onIntent(BookingIntent.ChangeDuration(-1)) },
@@ -135,7 +153,7 @@ fun BookingContent(
                 Text(
                     "${state.durationHours} ${if (state.durationHours == 1) "hour" else "hours"}",
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.testTag("duration_text"),
+                    modifier = Modifier.testTag("duration_text").semantics { liveRegion = LiveRegionMode.Polite },
                 )
                 FilledIconButton(
                     onClick = { onIntent(BookingIntent.ChangeDuration(+1)) },
@@ -159,7 +177,8 @@ fun BookingContent(
             if (state.error != null) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    modifier = Modifier.fillMaxWidth().testTag(if (state.conflict) "conflict_banner" else "error_banner"),
+                    modifier = Modifier.fillMaxWidth().testTag(if (state.conflict) "conflict_banner" else "error_banner")
+                        .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive },
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -174,7 +193,7 @@ fun BookingContent(
             }
 
             if (state.busy.isNotEmpty()) {
-                Text("Already booked", style = MaterialTheme.typography.titleSmall)
+                Text("Already booked", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
                 state.busy.take(6).forEach {
                     Text(
                         "${it.start.formatDateTime(state.zone)} → ${it.end.formatDateTime(state.zone)}",
@@ -187,7 +206,8 @@ fun BookingContent(
             Button(
                 onClick = { onIntent(BookingIntent.Submit) },
                 enabled = state.canSubmit,
-                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("confirm_button"),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("confirm_button")
+                    .semantics { if (state.isSubmitting) stateDescription = "Booking in progress" },
             ) {
                 if (state.isSubmitting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                 else Text("Confirm booking")

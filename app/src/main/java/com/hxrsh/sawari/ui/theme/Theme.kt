@@ -7,7 +7,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Teal = Color(0xFF00796B)
+private val Teal = Color(0xFF00695C) // teal 800: 00796B gave only 4.34:1 for price text on card surfaces
 private val LightScheme = lightColorScheme(
     primary = Teal,
     onPrimary = Color.White,

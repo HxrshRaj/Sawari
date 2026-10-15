@@ -1,0 +1,4 @@
+1. Account menu  [button, role=Button]
+2. My bookings  [heading]
+3. Maruti Swift, Bengaluru, Thu, 15 Oct · 11:55 PM to Fri, 16 Oct · 1:55 AM, ₹540, Confirmed  [state: Confirmed]
+4. Cancel booking for Maruti Swift  [button, role=Button]

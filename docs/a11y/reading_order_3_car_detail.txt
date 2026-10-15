@@ -1,0 +1,10 @@
+1. Back  [button, role=Button]
+2. Car details
+3. Maruti Swift  [heading]
+4. Bengaluru
+5. 5 seats
+6. Petrol
+7. ₹180 per hour
+8. Already booked  [heading]
+9. Fri, 16 Oct · 12:55 AM → Fri, 16 Oct · 3:55 AM
+10. Book this car  [button, role=Button]
