@@ -42,6 +42,13 @@ import com.hxrsh.sawari.ui.booking.BookingScreen
 import com.hxrsh.sawari.ui.bookings.MyBookingsScreen
 import com.hxrsh.sawari.ui.cars.CarListScreen
 import com.hxrsh.sawari.ui.detail.CarDetailScreen
+import com.hxrsh.sawari.ui.nav.DeepLink
+import com.hxrsh.sawari.ui.nav.DeepLinkParser
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.MutableStateFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +72,21 @@ class MainViewModel @Inject constructor(
         .onEach { analytics.setUser(it?.user?.id?.toString()) }
         .map { if (it == null) SessionState.LoggedOut else SessionState.LoggedIn(it.user) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SessionState.Loading)
+
+    /**
+     * A deep link waiting to be handled. It lives in the ViewModel, so it survives the login screen
+     * (logged-out users sign in first, then land on the target) and rotation.
+     */
+    private val _pendingLink = MutableStateFlow<DeepLink?>(null)
+    val pendingLink: StateFlow<DeepLink?> = _pendingLink
+
+    fun onLinkReceived(raw: String?) {
+        DeepLinkParser.parse(raw)?.let { _pendingLink.value = it }
+    }
+
+    fun onLinkHandled(link: DeepLink) {
+        if (_pendingLink.value == link) _pendingLink.value = null
+    }
 }
 
 object Routes {
@@ -85,7 +107,10 @@ fun SawariRoot(viewModel: MainViewModel = hiltViewModel()) {
         when (session) {
             SessionState.Loading -> Box(Modifier.fillMaxSize())
             SessionState.LoggedOut -> AuthScreen()
-            is SessionState.LoggedIn -> MainNav()
+            is SessionState.LoggedIn -> {
+                val pending by viewModel.pendingLink.collectAsStateWithLifecycle()
+                MainNav(pending, viewModel::onLinkHandled)
+            }
         }
     }
 }
@@ -98,12 +123,27 @@ private val tabs = listOf(
 )
 
 @Composable
-private fun MainNav() {
+private fun MainNav(pendingLink: DeepLink?, onLinkHandled: (DeepLink) -> Unit) {
     val navController = rememberNavController()
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(pendingLink) {
+        val link = pendingLink ?: return@LaunchedEffect
+        when (link) {
+            is DeepLink.OpenCar -> {
+                // Not launchSingleTop: that would reuse the open detail screen and keep showing the previous car.
+                val showing = navController.currentBackStackEntry?.takeIf { it.destination.route == Routes.CAR_DETAIL }?.arguments?.getInt("carId")
+                if (showing != link.carId) navController.navigate(Routes.carDetail(link.carId))
+            }
+            DeepLink.OpenBookings -> navController.navigateToTab(Routes.BOOKINGS)
+            is DeepLink.Invalid -> snackbar.showSnackbar("That link is not valid: ${link.reason}")
+        }
+        onLinkHandled(link)
+    }
     val backStack by navController.currentBackStackEntryAsState()
     val destination = backStack?.destination
     val showBar = tabs.any { tab -> destination?.hierarchy?.any { it.route == tab.route } == true }
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (showBar) {
                 NavigationBar {

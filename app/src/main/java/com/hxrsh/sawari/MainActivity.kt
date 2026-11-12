@@ -1,5 +1,6 @@
 package com.hxrsh.sawari
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,8 +22,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         splash.setKeepOnScreenCondition { mainViewModel.sessionState.value is SessionState.Loading }
         enableEdgeToEdge()
+        // Only the first creation: after rotation / process restore the old intent must not replay.
+        if (savedInstanceState == null) handleLink(intent)
         setContent {
             SawariTheme { SawariRoot(mainViewModel) }
         }
+    }
+
+    /** App already open (launchMode singleTask): the link arrives here instead of onCreate. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleLink(intent)
+    }
+
+    private fun handleLink(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) mainViewModel.onLinkReceived(intent.dataString)
     }
 }

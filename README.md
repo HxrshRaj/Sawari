@@ -147,6 +147,27 @@ Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-
 ## Deploying the backend (Render)
 `render.yaml` is a Blueprint: a Docker web service (`backend/Dockerfile`) plus a free Postgres, with `DATABASE_URL` wired in and a generated `JWT_SECRET`. In Render: *New → Blueprint → pick this repo*. The public docs URL will be `https://<service>.onrender.com/docs`. Deployed at https://sawari-api-1krd.onrender.com. I curl-tested the live service: `/health`, 24 cars in 3 cities, register, book, the same booking again (`409`), cancel.
 
+## Deep links
+| Link | Opens |
+|---|---|
+| `sawari://car/{id}` | that car's detail screen |
+| `sawari://bookings` | My bookings tab |
+| `https://sawari-api-1krd.onrender.com/app/car/{id}` and `/app/bookings` | same, as plain (unverified) https links |
+
+How it works: `MainActivity` is `singleTask`, so a link reaches an already-open app through `onNewIntent` and a closed app through `onCreate`. `DeepLinkParser` (pure Kotlin) turns the URI into `OpenCar` / `OpenBookings` / `Invalid`; the result waits in `MainViewModel`, so a **logged-out user signs in first and then lands on the target**. A car id that does not exist shows "Car not found" (the detail screen refreshes the cache first, so a cold start on an empty cache does not falsely say "not found"; offline it says it cannot load). A malformed link (`sawari://car/abc`) shows a snackbar and never crashes.
+
+Try it on an emulator (debug build, `adb` on PATH):
+```bash
+adb shell am start -a android.intent.action.VIEW -d "sawari://car/12" com.hxrsh.sawari
+adb shell am start -a android.intent.action.VIEW -d "sawari://bookings" com.hxrsh.sawari
+adb shell am start -a android.intent.action.VIEW -d "https://sawari-api-1krd.onrender.com/app/car/12" com.hxrsh.sawari
+```
+`bash scripts/deeplink_check.sh` runs the whole matrix against a local backend (cold start logged out then login, app already open, unknown id, malformed link, https link, cold start logged in) and prints PASS/FAIL. Last run: 8 of 8 PASS on an API 34 emulator.
+
+Tests: `DeepLinkParserTest` + `DeepLinkFlowTest` (JVM, 10 tests: a 28-row table of valid, broken and foreign URIs, pending link kept across login, unknown / empty-cache / offline car detail) and `DeepLinkIntentTest` (emulator, 4 tests: the manifest routes the custom-scheme and https URIs to `MainActivity`, does not claim foreign URIs, and a cold start with valid / unknown / malformed links does not crash).
+
+**Honest limits:** the https links are *not* verified App Links. That needs `https://sawari-api-1krd.onrender.com/.well-known/assetlinks.json` hosted with the app's signing fingerprint, which is not set up, so on a real phone Android may show a chooser instead of opening the app directly. The `onNewIntent` path (app already open) is verified with adb only; `ActivityScenario` cannot reliably close a `singleTask` activity, so there is no instrumented test for it.
+
 ## Quality
 | Area | Status | Where |
 |---|---|---|
