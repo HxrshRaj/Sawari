@@ -10,6 +10,8 @@ import com.hxrsh.sawari.domain.model.TimeSlot
 import com.hxrsh.sawari.domain.repository.AuthRepository
 import com.hxrsh.sawari.domain.repository.BookingRepository
 import com.hxrsh.sawari.domain.repository.CarRepository
+import com.hxrsh.sawari.domain.reminder.ReminderScheduler
+import com.hxrsh.sawari.domain.onSuccess
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import javax.inject.Inject
@@ -42,16 +44,22 @@ class RefreshBookingsUseCase @Inject constructor(private val repo: BookingReposi
     suspend operator fun invoke(): AppResult<Unit> = repo.refresh()
 }
 
-class CreateBookingUseCase @Inject constructor(private val repo: BookingRepository) {
+class CreateBookingUseCase @Inject constructor(
+    private val repo: BookingRepository,
+    private val reminders: ReminderScheduler,
+) {
     suspend operator fun invoke(carId: Int, start: Instant, end: Instant, now: Instant): AppResult<Booking> {
         if (!end.isAfter(start)) return AppResult.Failure(AppError.Validation("End time must be after start time"))
         if (start.isBefore(now.minusSeconds(300))) return AppResult.Failure(AppError.Validation("Start time is in the past"))
-        return repo.create(carId, start, end)
+        return repo.create(carId, start, end).onSuccess { reminders.schedule(it) }
     }
 }
 
-class CancelBookingUseCase @Inject constructor(private val repo: BookingRepository) {
-    suspend operator fun invoke(bookingId: Int): AppResult<Booking> = repo.cancel(bookingId)
+class CancelBookingUseCase @Inject constructor(
+    private val repo: BookingRepository,
+    private val reminders: ReminderScheduler,
+) {
+    suspend operator fun invoke(bookingId: Int): AppResult<Booking> = repo.cancel(bookingId).onSuccess { reminders.cancel(bookingId) }
 }
 
 class ObserveSessionUseCase @Inject constructor(private val repo: AuthRepository) {

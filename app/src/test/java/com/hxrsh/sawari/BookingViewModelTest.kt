@@ -40,7 +40,7 @@ class BookingViewModelTest {
         SavedStateHandle(mapOf("carId" to 1)),
         ObserveCarUseCase(carRepo),
         GetBusySlotsUseCase(carRepo),
-        CreateBookingUseCase(bookingRepo),
+        CreateBookingUseCase(bookingRepo, FakeReminderScheduler()),
         analytics,
         clock,
     )

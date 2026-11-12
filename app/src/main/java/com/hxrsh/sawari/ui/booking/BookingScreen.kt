@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hxrsh.sawari.ui.common.formatDate
+import com.hxrsh.sawari.ui.permissions.ReminderPermissionCard
+import com.hxrsh.sawari.ui.permissions.rememberNotificationPermissionController
 import com.hxrsh.sawari.ui.common.formatDateTime
 import com.hxrsh.sawari.ui.common.formatPrice
 import com.hxrsh.sawari.ui.common.formatTime
@@ -87,7 +89,7 @@ fun BookingScreen(onBack: () -> Unit, onBooked: () -> Unit, viewModel: BookingVi
             }
         }
     }
-    BookingContent(state, snackbar, onBack, viewModel::onIntent)
+    BookingContent(state, snackbar, onBack, viewModel::onIntent, extras = { ReminderPermissionCard(rememberNotificationPermissionController()) })
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,6 +99,8 @@ fun BookingContent(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onIntent: (BookingIntent) -> Unit,
+    /** Optional extra content above the confirm button (the reminder-permission card). */
+    extras: @Composable () -> Unit = {},
 ) {
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
@@ -202,6 +206,8 @@ fun BookingContent(
                     )
                 }
             }
+
+            extras()
 
             Button(
                 onClick = { onIntent(BookingIntent.Submit) },

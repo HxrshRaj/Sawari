@@ -8,10 +8,16 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.hxrsh.sawari.notifications.ReminderNotifications
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class SawariApp : Application(), ImageLoaderFactory {
+    override fun onCreate() {
+        super.onCreate()
+        ReminderNotifications.ensureChannel(this)
+    }
+
     /**
      * One app-wide image pipeline tuned for small devices: bounded memory cache, bounded disk cache and, on
      * low-RAM devices, RGB_565 bitmaps (half the memory of ARGB_8888; the photos have no alpha).

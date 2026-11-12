@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore)
+    implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.profileinstaller)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -167,5 +168,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.accessibility)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.androidx.test.uiautomator)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

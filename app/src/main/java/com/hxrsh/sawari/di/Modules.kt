@@ -18,6 +18,8 @@ import com.hxrsh.sawari.data.repository.CarRepositoryImpl
 import com.hxrsh.sawari.domain.repository.AuthRepository
 import com.hxrsh.sawari.domain.repository.BookingRepository
 import com.hxrsh.sawari.domain.repository.CarRepository
+import com.hxrsh.sawari.domain.reminder.ReminderScheduler
+import com.hxrsh.sawari.notifications.WorkManagerReminderScheduler
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -84,6 +86,7 @@ abstract class RepositoryModule {
     @Binds abstract fun auth(impl: AuthRepositoryImpl): AuthRepository
     @Binds abstract fun cars(impl: CarRepositoryImpl): CarRepository
     @Binds abstract fun bookings(impl: BookingRepositoryImpl): BookingRepository
+    @Binds abstract fun reminders(impl: WorkManagerReminderScheduler): ReminderScheduler
 }
 
 @Module

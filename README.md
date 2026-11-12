@@ -168,6 +168,18 @@ Tests: `DeepLinkParserTest` + `DeepLinkFlowTest` (JVM, 10 tests: a 28-row table 
 
 **Honest limits:** the https links are *not* verified App Links. That needs `https://sawari-api-1krd.onrender.com/.well-known/assetlinks.json` hosted with the app's signing fingerprint, which is not set up, so on a real phone Android may show a chooser instead of opening the app directly. The `onNewIntent` path (app already open) is verified with adb only; `ActivityScenario` cannot reliably close a `singleTask` activity, so there is no instrumented test for it.
 
+## Booking reminders and the notification permission
+A confirmed booking schedules a local notification **1 hour before it starts** (WorkManager, no server, no Firebase). Cancelling the booking cancels the reminder. Tapping the notification opens My bookings through the same deep link as `sawari://bookings`.
+
+- **Rule (`ReminderPlanner`, pure Kotlin):** fire at `start - 1h`. A booking that starts in less than an hour gets **no** reminder (a "starts in 1 hour" message would be false). Tested with fake clocks.
+- **Wiring:** `CreateBookingUseCase` / `CancelBookingUseCase` call a `ReminderScheduler` (interface in `domain`, WorkManager implementation in `notifications`). A failed booking or failed cancel changes nothing.
+- **Channel:** `booking_reminders`, created at app start.
+- **Android 13+ permission (`POST_NOTIFICATIONS`)** is handled on the booking screen by a reusable `PermissionController` with four states: *not asked* (explain first, in a dialog, then ask), *denied once* ("Ask again"), *denied permanently* ("Open settings", which opens the app's system settings page; the state refreshes when you come back), and *granted*. Android cannot tell "never asked" from "don't ask again", so the app remembers whether it has asked. Booking works in every state; only the reminder depends on the permission. Before Android 13 there is no runtime permission, so only the "blocked in settings" state applies.
+
+Tests: 14 JVM tests (`ReminderPlannerTest`: 7 fake-clock cases; `ReminderUseCaseTest`: 6; `PermissionStatusTest`: every state combination) and 14 emulator tests (`ReminderInstrumentedTest`: real WorkManager enqueue / cancel / replace / skip, the notification posted by the worker, the notification's tap intent delivering `sawari://bookings` to `MainActivity`; `PermissionFlowTest`: the **real system permission dialog** driven with UiAutomator, deny, ask again, deny again, ends at "Open settings" with a quiet no-op when showing a reminder, the granted state, each card state, rationale-before-request, and booking still working with notifications denied).
+
+**Honest limits:** nothing waited a real hour: the clock is faked and the worker is run directly. The "denied" emulator test needs the permission to start un-granted (fresh install; the tests run in name order and skip, not pass, if it is already granted) and needs Android 13+. The system dialog buttons are found by id or by text ("Don't allow"), so another Android version or a localized emulator could need a tweak. Reminders are not re-scheduled after a reboot beyond what WorkManager persists, are not reconciled with bookings cancelled from another device, and are not cancelled on logout. The notification channel's behaviour on OEM skins with aggressive battery savers is not tested.
+
 ## Quality
 | Area | Status | Where |
 |---|---|---|

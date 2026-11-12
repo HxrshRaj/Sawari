@@ -14,6 +14,7 @@ import com.hxrsh.sawari.domain.model.TimeSlot
 import com.hxrsh.sawari.domain.model.User
 import com.hxrsh.sawari.domain.repository.BookingRepository
 import com.hxrsh.sawari.domain.repository.CarRepository
+import com.hxrsh.sawari.domain.reminder.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -132,3 +133,10 @@ fun testApi(server: MockWebServer, client: okhttp3.OkHttpClient = okhttp3.OkHttp
         .addConverterFactory(Json { ignoreUnknownKeys = true }.asConverterFactory("application/json".toMediaType()))
         .build()
         .create(SawariApi::class.java)
+
+class FakeReminderScheduler : ReminderScheduler {
+    val scheduled = mutableListOf<Booking>()
+    val cancelled = mutableListOf<Int>()
+    override fun schedule(booking: Booking) { scheduled += booking }
+    override fun cancel(bookingId: Int) { cancelled += bookingId }
+}
