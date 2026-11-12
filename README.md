@@ -6,7 +6,7 @@ Browse cars in a city, pick a time slot, book, and see/cancel your bookings. A n
 |---|---|
 | Live API docs | https://sawari-api-1krd.onrender.com/docs (Render free tier: the first request after idle can take ~30 s) |
 | Debug APK | built by CI on every push, attached to the GitHub release on `v*` tags |
-| Tests | 44 JVM unit tests + 6 emulator UI tests + 10 backend tests (60) |
+| Tests | 95 JVM tests (72 app + 23 shared) + 49 emulator tests + 10 backend tests. The 23 shared tests also run on the iOS simulator in CI. Counts are from the last full run, see Tests |
 
 <p>
 <img src="docs/screenshots/01_login.png" width="150"> <img src="docs/screenshots/03_car_list.png" width="150"> <img src="docs/screenshots/05_booking.png" width="150"> <img src="docs/screenshots/07_conflict.png" width="150"> <img src="docs/screenshots/06_my_bookings.png" width="150"> <img src="docs/screenshots/10_offline_cars.png" width="150">
@@ -100,7 +100,7 @@ Events sent: `search`, `booking_created`, `booking_conflict`, `booking_cancelled
 | Room DAO tests | 5 | filters, atomic `replaceAll`, ordering, embedded car |
 | Compose UI tests | 6 | run on the emulator (`androidTest`) |
 
-(The JVM rows add up to 44: 22 ViewModel + 17 network/repository + 5 DAO.)
+(That table is the original 60-test baseline. Counts now: **JVM 95** = 72 in `app` + 23 in `shared/commonTest`; **emulator 49** = deep links 4, reminders 8, permission flow 6, licence scan 3, animations 7, Compose/accessibility 11, font scale 5, reading order 5; **backend 10** (not re-run locally for this branch; green in CI). The emulator tests need a fresh install for the permission-denial tests. Lint: 0 errors, 99 warnings.)
 
 ### Mutation checks (done once each, both caught)
 - **Overlap check:** removed the exclusion-constraint DDL: `test_overlap_rejected_but_adjacent_and_other_car_allowed` and `test_concurrent_double_booking_only_one_wins` failed (2 failed, 8 passed). Restored.
@@ -213,6 +213,23 @@ Tests: 1 JVM test for the reduce-motion rule and 7 emulator tests (skeleton and 
 
 **Honest limits:** I judged the animations by tests and by the screens I looked at on the emulator, not on a real device; smoothness is not measured. Enter animations replay when the list is rebuilt from scratch (new composition).
 
+## Shared Kotlin Multiplatform module (Android + iOS targets)
+`shared/` is a Kotlin Multiplatform library (targets `androidTarget`, `iosX64`, `iosArm64`, `iosSimulatorArm64`) holding the parts of the domain layer that are genuinely platform-independent: the models, `AppResult` / `AppError`, the use cases, the repository **interfaces**, `ReminderScheduler` / `ReminderPlanner`. The Android app depends on it; its package names did not change.
+
+What stayed in `app/` on purpose: Room, Retrofit/OkHttp, DataStore, WorkManager, CameraX, Compose, Hilt wiring and all ViewModels (they use Android `ViewModel`, `SavedStateHandle`, Compose types).
+
+What had to change to make the move honest:
+- **Dates:** `java.time.Instant` is JVM-only, so the models use `kotlinx.datetime.Instant`; the app converts at its edges (mappers, formatters, ViewModels).
+- **`@Immutable`:** it comes from Compose, which a shared module must not depend on. The app marks `com.hxrsh.sawari.domain.model.*` stable in `app/compose_stability.conf` instead. Re-measured: the card recomposition count in the filter-toggle benchmark is still 7 (5 of 5 runs).
+- **`@Inject`:** `javax.inject` is JVM-only, so the use cases are plain classes and `di/UseCaseModule.kt` builds them for Hilt.
+- **`expect/actual` (one real case): `AppLog`.** Android logs with `android.util.Log`, iOS with `NSLog`; neither exists on the other platform. Dates did not need `expect/actual` because kotlinx-datetime already covers them in common code. The first iOS run caught a real bug here: passing Kotlin strings to `NSLog` as `%@` varargs crashed the iOS test process; the actual now passes one escaped format string.
+
+**What is verified (and how):**
+- `:shared:testDebugUnitTest` runs the 23 `commonTest` tests on the JVM/Android target (locally and in CI): reminder rule, booking model, `AppResult`, create/cancel/auth use cases with hand-written fakes.
+- The CI job **`shared-ios`** (`macos-latest`) runs `./gradlew :shared:iosSimulatorArm64Test` and `:shared:linkDebugFrameworkIosSimulatorArm64`. Its last run on this branch was green: **23 tests ran on the iOS simulator, 0 failed**, and `SawariShared.framework` was produced (the job prints the totals from the test result files). That job is the only evidence for iOS; I have no Mac, so nothing iOS was run locally.
+
+**Honest limits:** there is **no iOS app**: no SwiftUI, no Compose Multiplatform UI, no Xcode project. The framework is built but nothing consumes it, so "the shared module compiles and its tests pass on iOS" is the whole claim. `iosX64` and `iosArm64` are declared but CI only builds and tests `iosSimulatorArm64`. The shared module has no networking or persistence, so an iOS client would still need those. Kotlin/Native compile warnings about expect/actual being in Beta are not suppressed.
+
 ## Quality
 | Area | Status | Where |
 |---|---|---|
@@ -222,7 +239,7 @@ Tests: 1 JVM test for the reduce-motion rule and 7 emulator tests (skeleton and 
 | Device / OS-version matrix | **Not run.** Only an Android 14 emulator has been used | n/a |
 
 ## Future scope
-- **iOS (SwiftUI) client**, not started. The architecture was kept portable on purpose: the FastAPI backend is client-agnostic, the domain layer (models, `AppResult`/`AppError`, use cases) has no Android types, and the unidirectional-state ViewModels map onto SwiftUI view models (`@Observable`, `async/await` in place of `Flow`, SwiftData/Core Data in place of Room as the offline source of truth). Needs a Mac to build.
+- **iOS client**, not started. What exists: the `shared` KMP module (domain layer) with a green iOS simulator test run in CI (see above). Still needed: networking, persistence (a Room/SQLDelight equivalent) and the UI (SwiftUI or Compose Multiplatform), and a Mac to build and run it.
 - Crashlytics end-to-end verification against a real Firebase project, a Figma-to-Compose design pass, and a real-device / multi-OS-version test matrix (see the Quality table above).
 - Encrypted token storage, pagination, and real payments.
 
@@ -233,5 +250,5 @@ Tests: 1 JVM test for the reduce-motion rule and 7 emulator tests (skeleton and 
 - **Firebase Crashlytics/Analytics are integrated and compile, but I never saw an event or crash in a Firebase console** (no Firebase project is available to me). The `firebase` flavour is therefore unverified end to end.
 - **All performance numbers are from an emulator**, not a physical device, and the frame-time results are inconclusive (see above). Start-up numbers are noisy (6 iterations).
 - Auth token is stored in plain DataStore (not encrypted); fine for a demo, not for production.
-- No push notifications, no pagination (24 cars), no payment/ID verification, English only.
+- Only local reminder notifications (no push, no server-sent notifications), no pagination (24 cars), no payment/ID verification, English only.
 - Play Store: listing assets prepared, **not published**; feature graphic and 512x512 store icon still to make.
