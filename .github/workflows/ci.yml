@@ -78,6 +78,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Shared tests on the iOS simulator
         run: ./gradlew :shared:iosSimulatorArm64Test
+      - name: Print the iOS test totals
+        run: |
+          python3 - <<'PY'
+          import glob, re
+          total = failed = 0
+          for p in glob.glob("shared/build/test-results/iosSimulatorArm64Test/*.xml"):
+              m = re.search(r'tests="(\d+)" skipped="(\d+)" failures="(\d+)" errors="(\d+)"', open(p).read(2000))
+              t, s, f, e = map(int, m.groups())
+              total += t; failed += f + e
+              print(p.split("/")[-1], "tests", t, "failed", f + e)
+          print("iOS simulator tests:", total, "failed:", failed)
+          assert total > 0 and failed == 0
+          PY
       - name: Build the iOS framework
         run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64
       - name: Show what was produced
