@@ -22,6 +22,8 @@ data class BookingState(
     val error: String? = null,
     /** True when the last failure was a 409: the slot was taken, so the UI highlights the busy list. */
     val conflict: Boolean = false,
+    /** Draft only: a photo of the licence in app-private storage. Never sent to the server. */
+    val licencePhotoPath: String? = null,
 ) {
     val start: LocalDateTime get() = LocalDateTime.of(startDate, startTime)
     val end: LocalDateTime get() = start.plusHours(durationHours.toLong())
@@ -40,6 +42,8 @@ sealed interface BookingIntent {
     data class ChangeDuration(val delta: Int) : BookingIntent
     data object Submit : BookingIntent
     data object DismissError : BookingIntent
+    data class AttachLicence(val path: String) : BookingIntent
+    data object RemoveLicence : BookingIntent
 }
 
 sealed interface BookingEffect {

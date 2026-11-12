@@ -26,6 +26,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.hxrsh.sawari.domain.model.Booking
@@ -171,7 +172,11 @@ class ComposeUiTest {
         rule.onNodeWithContentDescription("Fewer hours").assertIsDisplayed()
         rule.onNodeWithContentDescription("More hours").assertIsDisplayed()
         rule.onNode(isHeading() and hasText("When do you need it?")).assertExists()
-        assertTargets("back_button", "pick_date", "pick_time", "duration_minus", "duration_plus", "confirm_button")
+        assertTargets("back_button", "pick_date", "pick_time", "duration_minus", "duration_plus")
+        // The screen scrolls and the licence card made it taller: the confirm button now starts below the fold, and a
+        // partly visible node reports a clipped touch area, so scroll it into view like a user would before measuring.
+        rule.onNodeWithTag("confirm_button").performScrollTo()
+        assertTargets("confirm_button")
     }
 
     @OptIn(ExperimentalTestApi::class)

@@ -33,6 +33,7 @@ class BookingViewModelTest {
     private val carRepo = FakeCarRepository()
     private val bookingRepo = FakeBookingRepository()
     private val analytics = FakeAnalytics()
+    private val licenceStore = FakeLicencePhotoStore()
     // 2030-06-01 09:20 UTC, so the default slot is 10:00 that day (now + 1h, truncated to the hour)
     private val clock = Clock.fixed(Instant.parse("2030-06-01T09:20:00Z"), ZoneOffset.UTC)
 
@@ -41,6 +42,7 @@ class BookingViewModelTest {
         ObserveCarUseCase(carRepo),
         GetBusySlotsUseCase(carRepo),
         CreateBookingUseCase(bookingRepo, FakeReminderScheduler()),
+        licenceStore,
         analytics,
         clock,
     )

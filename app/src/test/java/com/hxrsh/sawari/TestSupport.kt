@@ -15,6 +15,7 @@ import com.hxrsh.sawari.domain.model.User
 import com.hxrsh.sawari.domain.repository.BookingRepository
 import com.hxrsh.sawari.domain.repository.CarRepository
 import com.hxrsh.sawari.domain.reminder.ReminderScheduler
+import com.hxrsh.sawari.ui.licence.LicencePhotoStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -139,4 +140,14 @@ class FakeReminderScheduler : ReminderScheduler {
     val cancelled = mutableListOf<Int>()
     override fun schedule(booking: Booking) { scheduled += booking }
     override fun cancel(bookingId: Int) { cancelled += bookingId }
+}
+
+class FakeLicencePhotoStore : LicencePhotoStore {
+    val existing = mutableSetOf<String>()
+    private var counter = 0
+    var importFails = false
+    override fun newFile(): java.io.File = java.io.File("/fake/licence-${++counter}.jpg").also { existing += it.path }
+    override fun delete(path: String) { existing -= path }
+    override suspend fun importFrom(open: () -> java.io.InputStream?): String? =
+        if (importFails || open() == null) null else java.io.File("/fake/picked-${++counter}.jpg").path.also { existing += it }
 }

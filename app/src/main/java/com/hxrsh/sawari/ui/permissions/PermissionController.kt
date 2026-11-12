@@ -25,6 +25,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.hxrsh.sawari.notifications.ReminderNotifications
 
 @Stable
 class PermissionController(val status: PermissionStatus, val request: () -> Unit, val openSettings: () -> Unit)
@@ -55,10 +56,14 @@ fun openAppSettings(context: Context) {
 /** Notifications: a runtime permission only from Android 13; before that they are on unless switched off in settings. */
 @Composable
 fun rememberNotificationPermissionController(): PermissionController {
+    val context = LocalContext.current
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        rememberPermissionController(Manifest.permission.POST_NOTIFICATIONS)
+        val base = rememberPermissionController(Manifest.permission.POST_NOTIFICATIONS)
+        // Create the channel only now, right before our own request, so the system never prompts on its own.
+        remember(base) {
+            PermissionController(base.status, request = { ReminderNotifications.ensureChannel(context); base.request() }, openSettings = base.openSettings)
+        }
     } else {
-        val context = LocalContext.current
         val enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
         PermissionController(
             if (enabled) PermissionStatus.Granted else PermissionStatus.DeniedPermanently,

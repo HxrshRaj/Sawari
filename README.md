@@ -180,6 +180,39 @@ Tests: 14 JVM tests (`ReminderPlannerTest`: 7 fake-clock cases; `ReminderUseCase
 
 **Honest limits:** nothing waited a real hour: the clock is faked and the worker is run directly. The "denied" emulator test needs the permission to start un-granted (fresh install; the tests run in name order and skip, not pass, if it is already granted) and needs Android 13+. The system dialog buttons are found by id or by text ("Don't allow"), so another Android version or a localized emulator could need a tweak. Reminders are not re-scheduled after a reboot beyond what WorkManager persists, are not reconciled with bookings cancelled from another device, and are not cancelled on logout. The notification channel's behaviour on OEM skins with aggressive battery savers is not tested.
 
+## Driving licence photo (camera, on-device only)
+The booking screen has an optional **Scan driving licence** card: explain, ask for the camera, live CameraX preview, take photo, review, **Retake** or **Use photo**. The confirmed photo's *path* becomes part of the booking *draft*. It is not uploaded, not verified (no OCR, no ID check) and is deleted when you remove it, when the booking succeeds, or when you leave the booking screen. It lives in app-private storage (`filesDir/licence`).
+
+- **Permission:** same reusable controller as the reminders (not asked, denied once, don't-ask-again with an "Open settings" button). If the camera is refused, the **system photo picker** (no permission needed) is offered as a fallback.
+- **State machine:** `ScanState.on(event)` is a pure function (Preview, Capturing, Review, Done, Cancelled). A double tap on the shutter, a late camera callback after Retake, or Confirm with no photo are ignored.
+- **Camera lifecycle:** CameraX is bound to the lifecycle in a `DisposableEffect` and unbound on leave; the shutter stays disabled until the camera is really bound. Only the back camera is configured (`CameraXConfig` limiter), which also fixes CameraX refusing to start on devices that declare a front camera they do not have (the stock emulator does).
+- **Bugs the real-app check found and I fixed:** (1) tapping the shutter before the camera was ready failed the capture; (2) after **Use photo** the app silently re-opened the camera while closing the scanner and kept holding it on the booking screen (a late CameraX bind callback ran after the preview was gone). Both are covered now.
+
+Verified on the emulator (its virtual back camera): `bash scripts/licence_check.sh` drives the real debug app and checks, among others, that the rationale shows before the system dialog, the camera is in use only while previewing, the preview and the review survive rotation, exactly one photo exists after a capture, a retaken photo is deleted, the camera is released while reviewing and after confirming, Back closes the scanner, and that **LeakCanary** (debug build) did not dump the heap or report a leak after repeated open/close of the scanner. Tests: 16 JVM (state-machine table, file deletion on retake / cancel / replace, picker import, draft lifecycle) and 3 emulator tests (the real camera permission dialogs: deny, ask again, deny, "Open settings" + picker fallback; a real capture, retake, confirm with the files checked on disk).
+
+**Honest limits:** the emulator camera is a synthetic scene, so image quality, autofocus and real-device camera quirks are untested. The photo picker fallback is shown but I could not drive the system picker UI, so picking a photo is covered by unit tests of the import path only. LeakCanary only proves no leak on the paths I exercised. The photo file is not encrypted. Debug builds include LeakCanary, which shows its own notification-permission dialog on Android 13+ (the check script pre-grants it); release builds do not.
+
+## Animations (and reduced motion)
+- **Car list:** a skeleton with a shimmer replaces the spinner while loading (still announced once as "Loading"); cards fade and slide up the first time they appear (new ids only, not when scrolling back); `animateItem()` slides cards to their new place when a filter reorders the list.
+- **Booking summary:** the card animates its size, and the total rolls up or down when the duration changes (`AnimatedContent`).
+- **Reduced motion:** if the user turned animations off (Developer options "Animator duration scale: off", which "Remove animations" also sets), `LocalReduceMotion` is true: no shimmer (a static placeholder), no enter transition, and the total is a plain `Text` with no `AnimatedContent`. The app follows the setting live (`ContentObserver`). Tested with the real system setting.
+- **Why a wrapper composable and not a `Modifier` for the enter animation:** a modifier created inside the list item would make every `CarCard` recompose when the animation starts. The wrapper keeps the animation state in its own scope and applies progress in the graphics layer (draw phase).
+
+**Accessibility re-checked after the change** (emulator): the automated Compose accessibility checks, the 200% font-scale tests, the reading-order tests and the 48 dp touch-target assertions all pass. One test had to change: the booking screen got taller (licence card), so the confirm button starts below the fold and a partly visible node reports a clipped touch area; the test now scrolls it into view before measuring, as a user would. No layout or size was weakened.
+
+**Recomposition re-measured** with the method from the Performance section (Macrobenchmark `ListBenchmark.filterToggleOptimised`, `CarCard` trace section, same AVD, 5 iterations, baseline = the commit before these changes, built and run the same way):
+
+| | Before | After |
+|---|---|---|
+| Card bodies run in the 4-step city-filter toggle | 7 (7,7,7,7,7) | **7** (7,7,7,7,7) |
+| Summed time in `CarCard` composition, median (range) | 21.0 ms (11.8 to 53.2) | 56.2 ms (30.1 to 71.7) |
+
+The count did not change. The time did look higher, but the ranges overlap and this emulator is noisy, so I do not claim either "no cost" or "a cost". Frame time and jank were **not** re-measured.
+
+Tests: 1 JVM test for the reduce-motion rule and 7 emulator tests (skeleton and its announcement, with and without reduced motion; cards appear and stay clickable; the total ends on the right price and, with reduced motion, has no outgoing copy; the real system animator setting is detected and followed live).
+
+**Honest limits:** I judged the animations by tests and by the screens I looked at on the emulator, not on a real device; smoothness is not measured. Enter animations replay when the list is rebuilt from scratch (new composition).
+
 ## Quality
 | Area | Status | Where |
 |---|---|---|

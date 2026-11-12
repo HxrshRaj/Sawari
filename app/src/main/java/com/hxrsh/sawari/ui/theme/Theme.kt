@@ -5,6 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import com.hxrsh.sawari.ui.common.LocalReduceMotion
+import com.hxrsh.sawari.ui.common.rememberSystemReduceMotion
 import androidx.compose.ui.graphics.Color
 
 private val Teal = Color(0xFF00695C) // teal 800: 00796B gave only 4.34:1 for price text on card surfaces
@@ -35,5 +38,7 @@ private val DarkScheme = darkColorScheme(
 
 @Composable
 fun SawariTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (darkTheme) DarkScheme else LightScheme, content = content)
+    CompositionLocalProvider(LocalReduceMotion provides rememberSystemReduceMotion()) {
+        MaterialTheme(colorScheme = if (darkTheme) DarkScheme else LightScheme, content = content)
+    }
 }
