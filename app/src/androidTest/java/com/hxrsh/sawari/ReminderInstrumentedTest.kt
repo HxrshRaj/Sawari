@@ -28,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
+import kotlinx.datetime.toKotlinInstant
 import java.time.ZoneOffset
 
 /**
@@ -41,7 +42,7 @@ class ReminderInstrumentedTest {
     private val car = Car(1, "Maruti Swift", "Bengaluru", 180, "", 5, "Petrol")
 
     private fun booking(id: Int, startsInHours: Long, status: BookingStatus = BookingStatus.CONFIRMED) =
-        Booking(id, car, now.plusSeconds(startsInHours * 3600), now.plusSeconds((startsInHours + 3) * 3600), 540, status)
+        Booking(id, car, now.plusSeconds(startsInHours * 3600).toKotlinInstant(), now.plusSeconds((startsInHours + 3) * 3600).toKotlinInstant(), 540, status)
 
     private fun states(id: Int): List<WorkInfo.State> =
         WorkManager.getInstance(ctx).getWorkInfosForUniqueWork(WorkManagerReminderScheduler.workName(id)).get().map { it.state }

@@ -12,7 +12,9 @@ import com.hxrsh.sawari.domain.model.BookingStatus
 import com.hxrsh.sawari.domain.reminder.ReminderPlanner
 import com.hxrsh.sawari.domain.reminder.ReminderScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.datetime.toKotlinInstant
 import java.time.Clock
+import kotlin.time.toJavaDuration
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,7 +42,7 @@ class WorkManagerReminderScheduler @Inject constructor(
 
     override fun schedule(booking: Booking) {
         if (booking.status != BookingStatus.CONFIRMED) return
-        val delay = planner.delayUntilReminder(booking.start, clock.instant()) ?: return
+        val delay = planner.delayUntilReminder(booking.start, clock.instant().toKotlinInstant())?.toJavaDuration() ?: return
         val request = OneTimeWorkRequestBuilder<BookingReminderWorker>()
             .setInitialDelay(delay)
             .setInputData(

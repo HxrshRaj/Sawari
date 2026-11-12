@@ -1,6 +1,7 @@
 package com.hxrsh.sawari.ui.common
 
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlinx.datetime.toJavaInstant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -14,7 +15,7 @@ private val timeOnly = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()
 
 fun formatPrice(rupees: Int): String = "₹$rupees"
 
-fun Instant.formatDateTime(zone: ZoneId = ZoneId.systemDefault()): String = dateTime.format(atZone(zone))
+fun Instant.formatDateTime(zone: ZoneId = ZoneId.systemDefault()): String = dateTime.format(toJavaInstant().atZone(zone))
 
 fun LocalDate.formatDate(): String = dateOnly.format(this)
 

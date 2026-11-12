@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinInstant
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -82,9 +83,9 @@ class BookingViewModel @Inject constructor(
         if (!s.canSubmit) return
         _state.update { it.copy(isSubmitting = true, error = null, conflict = false) }
         viewModelScope.launch {
-            val start = s.start.atZone(s.zone).toInstant()
-            val end = s.end.atZone(s.zone).toInstant()
-            when (val result = createBooking(carId, start, end, clock.instant())) {
+            val start = s.start.atZone(s.zone).toInstant().toKotlinInstant()
+            val end = s.end.atZone(s.zone).toInstant().toKotlinInstant()
+            when (val result = createBooking(carId, start, end, clock.instant().toKotlinInstant())) {
                 is AppResult.Success -> {
                     analytics.logEvent(Events.BOOKING_CREATED, mapOf("car_id" to carId.toString(), "hours" to s.durationHours.toString()))
                     // The licence photo was only a draft attachment and is not uploaded: do not keep it around.

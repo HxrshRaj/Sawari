@@ -1,8 +1,9 @@
 package com.hxrsh.sawari.domain.reminder
 
 import com.hxrsh.sawari.domain.model.Booking
-import java.time.Duration
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 /** Schedules / cancels the "your booking starts soon" reminder. The Android implementation uses WorkManager. */
 interface ReminderScheduler {
@@ -10,7 +11,7 @@ interface ReminderScheduler {
     fun cancel(bookingId: Int)
 }
 
-/** Pure scheduling rule, so it can be tested with a fake clock. */
+/** Pure scheduling rule, so it can be tested with plain timestamps. */
 class ReminderPlanner(private val lead: Duration = DEFAULT_LEAD) {
     /**
      * Time to wait from [now] until the reminder should fire ([lead] before [start]).
@@ -18,11 +19,11 @@ class ReminderPlanner(private val lead: Duration = DEFAULT_LEAD) {
      * because a "starts in 1 hour" notification would be a lie.
      */
     fun delayUntilReminder(start: Instant, now: Instant): Duration? {
-        val delay = Duration.between(now, start.minus(lead))
-        return if (delay.isNegative) null else delay
+        val delay = (start - lead) - now
+        return if (delay.isNegative()) null else delay
     }
 
     companion object {
-        val DEFAULT_LEAD: Duration = Duration.ofHours(1)
+        val DEFAULT_LEAD: Duration = 1.hours
     }
 }

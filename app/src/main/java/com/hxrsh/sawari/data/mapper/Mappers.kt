@@ -12,11 +12,12 @@ import com.hxrsh.sawari.domain.model.Car
 import com.hxrsh.sawari.domain.model.Session
 import com.hxrsh.sawari.domain.model.TimeSlot
 import com.hxrsh.sawari.domain.model.User
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlinx.datetime.toKotlinInstant
 import java.time.OffsetDateTime
 
 // The API returns ISO-8601 with an offset ("Z" or "+00:00"); OffsetDateTime accepts both.
-internal fun parseInstant(iso: String): Instant = OffsetDateTime.parse(iso).toInstant()
+internal fun parseInstant(iso: String): Instant = OffsetDateTime.parse(iso).toInstant().toKotlinInstant()
 
 fun CarDto.toEntity() = CarEntity(id, name, city, pricePerHour, imageUrl, seats, fuel)
 
@@ -24,8 +25,8 @@ fun CarEntity.toDomain() = Car(id, name, city, pricePerHour, imageUrl, seats, fu
 
 fun BookingDto.toEntity() = BookingEntity(
     id = id,
-    startMillis = parseInstant(startTime).toEpochMilli(),
-    endMillis = parseInstant(endTime).toEpochMilli(),
+    startMillis = parseInstant(startTime).toEpochMilliseconds(),
+    endMillis = parseInstant(endTime).toEpochMilliseconds(),
     totalPrice = totalPrice,
     status = status,
     car = car.toEntity(),
@@ -34,8 +35,8 @@ fun BookingDto.toEntity() = BookingEntity(
 fun BookingEntity.toDomain() = Booking(
     id = id,
     car = car.toDomain(),
-    start = Instant.ofEpochMilli(startMillis),
-    end = Instant.ofEpochMilli(endMillis),
+    start = Instant.fromEpochMilliseconds(startMillis),
+    end = Instant.fromEpochMilliseconds(endMillis),
     totalPrice = totalPrice,
     status = if (status.equals("cancelled", ignoreCase = true)) BookingStatus.CANCELLED else BookingStatus.CONFIRMED,
 )

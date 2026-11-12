@@ -71,15 +71,15 @@ class BookingViewModelTest {
         }
         val (carId, start, end) = bookingRepo.created.single()
         assertEquals(1, carId)
-        assertEquals(Instant.parse("2030-06-01T10:00:00Z"), start)
-        assertEquals(Instant.parse("2030-06-01T13:00:00Z"), end)
+        assertEquals(kotlinx.datetime.Instant.parse("2030-06-01T10:00:00Z"), start)
+        assertEquals(kotlinx.datetime.Instant.parse("2030-06-01T13:00:00Z"), end)
         assertEquals(Events.BOOKING_CREATED, analytics.events.single().first)
         assertFalse(vm.state.value.isSubmitting)
     }
 
     @Test fun `conflict from the server shows the conflict state, reloads busy slots and keeps the user on the screen`() = runTest {
         bookingRepo.createResult = AppResult.Failure(AppError.Conflict("This car is already booked for part of that time range"))
-        val slot = TimeSlot(Instant.parse("2030-06-01T10:00:00Z"), Instant.parse("2030-06-01T13:00:00Z"))
+        val slot = TimeSlot(kotlinx.datetime.Instant.parse("2030-06-01T10:00:00Z"), kotlinx.datetime.Instant.parse("2030-06-01T13:00:00Z"))
         carRepo.busy = AppResult.Success(listOf(slot))
         val vm = vm()
         vm.effects.test {

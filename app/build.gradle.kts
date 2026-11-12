@@ -112,7 +112,12 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+composeCompiler {
+    stabilityConfigurationFile = layout.projectDirectory.file("compose_stability.conf")
+}
+
 dependencies {
+    implementation(project(":shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.splash)
     implementation(libs.androidx.activity.compose)

@@ -45,7 +45,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.Instant
+import kotlinx.datetime.Clock
 
 @RunWith(AndroidJUnit4::class)
 class ComposeUiTest {
@@ -106,7 +106,7 @@ class ComposeUiTest {
     }
 
     @Test fun bookingCard_cancelButtonOnlyWhenCancellable() {
-        val booking = Booking(5, swift, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 540, BookingStatus.CONFIRMED)
+        val booking = Booking(5, swift, soon(3600), soon(10800), 540, BookingStatus.CONFIRMED)
         var cancelRequests = 0
         rule.setContent {
             SawariTheme {
@@ -127,8 +127,8 @@ class ComposeUiTest {
     // plus explicit assertions. Runs the same checks on every screen.
     // ---------------------------------------------------------------------------------------------
 
-    private val busy = listOf(TimeSlot(Instant.now().plusSeconds(7200), Instant.now().plusSeconds(18000)))
-    private val upcoming = Booking(5, swift, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 540, BookingStatus.CONFIRMED)
+    private val busy = listOf(TimeSlot(soon(7200), soon(18000)))
+    private val upcoming = Booking(5, swift, soon(3600), soon(10800), 540, BookingStatus.CONFIRMED)
 
     /** Real touch-target check: Material widgets enlarge their touch area beyond their layout bounds, so measure that. */
     private fun assertTargets(vararg tags: String) {
@@ -182,7 +182,7 @@ class ComposeUiTest {
     @OptIn(ExperimentalTestApi::class)
     @Test fun a11y_myBookings() {
         rule.enableAccessibilityChecks()
-        val state = BookingsState(content = UiState.Content(listOf(upcoming, upcoming.copy(id = 6, status = BookingStatus.CANCELLED))), now = Instant.now())
+        val state = BookingsState(content = UiState.Content(listOf(upcoming, upcoming.copy(id = 6, status = BookingStatus.CANCELLED))), now = Clock.System.now())
         rule.setContent {
             SawariTheme { MyBookingsContent(state, androidx.compose.material3.SnackbarHostState(), {}, {}, {}, showDebugMenu = false) }
         }

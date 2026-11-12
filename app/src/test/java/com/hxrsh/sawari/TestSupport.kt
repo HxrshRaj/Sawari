@@ -31,7 +31,8 @@ import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.hours
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule : TestWatcher() {
@@ -50,7 +51,12 @@ object Fixtures {
     val session = Session("tok", user)
 
     fun booking(id: Int, car: Car = swift, status: BookingStatus = BookingStatus.CONFIRMED, startHoursFromNow: Long = 2) =
-        Booking(id, car, Instant.now().plusSeconds(startHoursFromNow * 3600), Instant.now().plusSeconds((startHoursFromNow + 3) * 3600), car.pricePerHour * 3, status)
+        Booking(
+            id, car,
+            kotlinx.datetime.Clock.System.now() + startHoursFromNow.hours,
+            kotlinx.datetime.Clock.System.now() + (startHoursFromNow + 3).hours,
+            car.pricePerHour * 3, status,
+        )
 
     fun carJson(c: Car) =
         """{"id":${c.id},"name":"${c.name}","city":"${c.city}","price_per_hour":${c.pricePerHour},"image_url":"${c.imageUrl}","seats":${c.seats},"fuel":"${c.fuel}"}"""

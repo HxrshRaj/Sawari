@@ -31,7 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.time.Instant
+import kotlinx.datetime.Clock
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -45,8 +45,8 @@ class ReadingOrderTest {
 
     private val swift = Car(1, "Maruti Swift", "Bengaluru", 180, "", 5, "Petrol")
     private val nexon = Car(2, "Tata Nexon EV", "Bengaluru", 320, "", 5, "Electric")
-    private val slot = TimeSlot(Instant.now().plusSeconds(7200), Instant.now().plusSeconds(18000))
-    private val booking = Booking(5, swift, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 540, BookingStatus.CONFIRMED)
+    private val slot = TimeSlot(soon(7200), soon(18000))
+    private val booking = Booking(5, swift, soon(3600), soon(10800), 540, BookingStatus.CONFIRMED)
 
     private class Stop(val top: Float, val left: Float, val text: String)
 
@@ -108,6 +108,6 @@ class ReadingOrderTest {
     }
 
     @Test fun myBookings() = dump("5_my_bookings") {
-        MyBookingsContent(BookingsState(content = UiState.Content(listOf(booking)), now = Instant.now()), SnackbarHostState(), {}, {}, {}, showDebugMenu = false)
+        MyBookingsContent(BookingsState(content = UiState.Content(listOf(booking)), now = Clock.System.now()), SnackbarHostState(), {}, {}, {}, showDebugMenu = false)
     }
 }
