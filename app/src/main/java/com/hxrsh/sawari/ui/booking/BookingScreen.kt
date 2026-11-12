@@ -7,6 +7,15 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +70,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hxrsh.sawari.ui.common.LocalReduceMotion
 import com.hxrsh.sawari.ui.common.formatDate
+import com.hxrsh.sawari.ui.licence.LicenceScanScreen
+import com.hxrsh.sawari.ui.permissions.ReminderPermissionCard
+import com.hxrsh.sawari.ui.permissions.rememberNotificationPermissionController
 import com.hxrsh.sawari.ui.common.formatDateTime
 import com.hxrsh.sawari.ui.common.formatPrice
 import com.hxrsh.sawari.ui.common.formatTime
@@ -87,7 +101,19 @@ fun BookingScreen(onBack: () -> Unit, onBooked: () -> Unit, viewModel: BookingVi
             }
         }
     }
-    BookingContent(state, snackbar, onBack, viewModel::onIntent)
+    var scanning by rememberSaveable { mutableStateOf(false) }
+    if (scanning) {
+        LicenceScanScreen(
+            onDone = { path -> viewModel.onIntent(BookingIntent.AttachLicence(path)); scanning = false },
+            onCancel = { scanning = false },
+        )
+    } else {
+        BookingContent(
+            state, snackbar, onBack, viewModel::onIntent,
+            extras = { ReminderPermissionCard(rememberNotificationPermissionController()) },
+            onScanLicence = { scanning = true },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,6 +123,9 @@ fun BookingContent(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onIntent: (BookingIntent) -> Unit,
+    /** Optional extra content above the confirm button (the reminder-permission card). */
+    extras: @Composable () -> Unit = {},
+    onScanLicence: () -> Unit = {},
 ) {
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
@@ -163,14 +192,28 @@ fun BookingContent(
             }
 
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().animateContentSize(if (LocalReduceMotion.current) snap() else spring()).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Text("From  ${state.start.formatDateTime()}", style = MaterialTheme.typography.bodyMedium)
                     Text("Until  ${state.end.formatDateTime()}", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Total ${formatPrice(state.total)}",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.testTag("total_text"),
-                    )
+                    // The price rolls up or down when the duration changes. With reduced motion there is no AnimatedContent at
+                    // all (not even a zero-length one, which still keeps the old price on screen for a few frames).
+                    if (LocalReduceMotion.current) {
+                        Text("Total ${formatPrice(state.total)}", style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("total_text"))
+                    } else {
+                        AnimatedContent(
+                            targetState = state.total,
+                            transitionSpec = {
+                                if (targetState > initialState) (slideInVertically { it / 2 } + fadeIn()) togetherWith (slideOutVertically { -it / 2 } + fadeOut())
+                                else (slideInVertically { -it / 2 } + fadeIn()) togetherWith (slideOutVertically { it / 2 } + fadeOut())
+                            },
+                            label = "total",
+                        ) { total ->
+                            Text("Total ${formatPrice(total)}", style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("total_text"))
+                        }
+                    }
                 }
             }
 
@@ -202,6 +245,10 @@ fun BookingContent(
                     )
                 }
             }
+
+            LicenceSection(state.licencePhotoPath, onScanLicence, onRemove = { onIntent(BookingIntent.RemoveLicence) })
+
+            extras()
 
             Button(
                 onClick = { onIntent(BookingIntent.Submit) },
@@ -254,4 +301,23 @@ fun BookingContent(
 private object NotInThePast : SelectableDates {
     override fun isSelectableDate(utcTimeMillis: Long): Boolean =
         Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate() >= LocalDate.now().minusDays(0)
+}
+
+@Composable
+private fun LicenceSection(photoPath: String?, onScan: () -> Unit, onRemove: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth().testTag("licence_section")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Driving licence (optional)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+            if (photoPath == null) {
+                Text("Take a photo to keep with this booking draft. It stays on this phone and is not uploaded or verified.", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = onScan, modifier = Modifier.heightIn(min = 48.dp).testTag("scan_licence_button")) { Text("Scan driving licence") }
+            } else {
+                Text("Licence photo attached (on this phone only).", modifier = Modifier.testTag("licence_attached"))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onScan, modifier = Modifier.heightIn(min = 48.dp).testTag("rescan_licence_button")) { Text("Replace") }
+                    TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = 48.dp).testTag("remove_licence_button")) { Text("Remove") }
+                }
+            }
+        }
+    }
 }

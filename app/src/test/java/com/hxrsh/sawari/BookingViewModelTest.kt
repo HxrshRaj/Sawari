@@ -33,6 +33,7 @@ class BookingViewModelTest {
     private val carRepo = FakeCarRepository()
     private val bookingRepo = FakeBookingRepository()
     private val analytics = FakeAnalytics()
+    private val licenceStore = FakeLicencePhotoStore()
     // 2030-06-01 09:20 UTC, so the default slot is 10:00 that day (now + 1h, truncated to the hour)
     private val clock = Clock.fixed(Instant.parse("2030-06-01T09:20:00Z"), ZoneOffset.UTC)
 
@@ -40,7 +41,8 @@ class BookingViewModelTest {
         SavedStateHandle(mapOf("carId" to 1)),
         ObserveCarUseCase(carRepo),
         GetBusySlotsUseCase(carRepo),
-        CreateBookingUseCase(bookingRepo),
+        CreateBookingUseCase(bookingRepo, FakeReminderScheduler()),
+        licenceStore,
         analytics,
         clock,
     )
@@ -69,15 +71,15 @@ class BookingViewModelTest {
         }
         val (carId, start, end) = bookingRepo.created.single()
         assertEquals(1, carId)
-        assertEquals(Instant.parse("2030-06-01T10:00:00Z"), start)
-        assertEquals(Instant.parse("2030-06-01T13:00:00Z"), end)
+        assertEquals(kotlinx.datetime.Instant.parse("2030-06-01T10:00:00Z"), start)
+        assertEquals(kotlinx.datetime.Instant.parse("2030-06-01T13:00:00Z"), end)
         assertEquals(Events.BOOKING_CREATED, analytics.events.single().first)
         assertFalse(vm.state.value.isSubmitting)
     }
 
     @Test fun `conflict from the server shows the conflict state, reloads busy slots and keeps the user on the screen`() = runTest {
         bookingRepo.createResult = AppResult.Failure(AppError.Conflict("This car is already booked for part of that time range"))
-        val slot = TimeSlot(Instant.parse("2030-06-01T10:00:00Z"), Instant.parse("2030-06-01T13:00:00Z"))
+        val slot = TimeSlot(kotlinx.datetime.Instant.parse("2030-06-01T10:00:00Z"), kotlinx.datetime.Instant.parse("2030-06-01T13:00:00Z"))
         carRepo.busy = AppResult.Success(listOf(slot))
         val vm = vm()
         vm.effects.test {

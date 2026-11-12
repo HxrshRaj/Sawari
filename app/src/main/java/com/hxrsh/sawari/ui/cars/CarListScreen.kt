@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -36,7 +38,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hxrsh.sawari.domain.model.Car
 import com.hxrsh.sawari.ui.common.EmptyState
 import com.hxrsh.sawari.ui.common.ErrorState
-import com.hxrsh.sawari.ui.common.LoadingState
 import com.hxrsh.sawari.ui.common.OfflineBanner
 import com.hxrsh.sawari.ui.common.UiState
 
@@ -102,7 +103,7 @@ fun CarListContent(
         }
         PullToRefreshBox(isRefreshing = state.isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
             when (val content = state.content) {
-                UiState.Loading -> LoadingState()
+                UiState.Loading -> CarListSkeleton()
                 UiState.Empty -> EmptyState("No cars found", "Try a different search or clear the filters.")
                 is UiState.Error -> ErrorState(content.message, onRetry = onRefresh)
                 is UiState.Content -> if (naive) NaiveCarList(content.data, onCarClick) else CarList(content.data, onCarClick)
@@ -138,6 +139,8 @@ private fun FilterRow(
 @Composable
 private fun CarList(cars: List<Car>, onCarClick: (Int) -> Unit) {
     val listState = rememberLazyListState()
+    // Ids already shown once: only cards that are new to the list animate in, not ones scrolled back into view.
+    val seen = remember { mutableSetOf<Int>() }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().testTag("car_list"),
@@ -145,8 +148,13 @@ private fun CarList(cars: List<Car>, onCarClick: (Int) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Stable key + contentType: item state survives reordering/refresh and Compose can reuse item slots.
-        items(cars, key = { it.id }, contentType = { "car" }) { car ->
-            CarCard(car = car, onClick = onCarClick)
+        itemsIndexed(cars, key = { _, car -> car.id }, contentType = { _, _ -> "car" }) { index, car ->
+            val play = remember { car.id !in seen }
+            LaunchedEffect(car.id) { seen += car.id }
+            // animateItem(): cards slide to their new place when a filter reorders or removes others.
+            EnterOnFirstShow(play, index, Modifier.animateItem()) {
+                CarCard(car = car, onClick = onCarClick)
+            }
         }
     }
 }

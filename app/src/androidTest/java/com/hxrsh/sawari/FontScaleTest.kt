@@ -33,7 +33,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.time.Instant
+import kotlinx.datetime.Clock
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -48,8 +48,8 @@ class FontScaleTest {
 
     private val long = Car(1, "Toyota Innova Crysta Hybrid", "Bengaluru", 500, "", 7, "Diesel")
     private val short = Car(2, "Tata Nexon EV", "Bengaluru", 320, "", 5, "Electric")
-    private val slot = TimeSlot(Instant.now().plusSeconds(7200), Instant.now().plusSeconds(18000))
-    private val booking = Booking(5, long, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 1500, BookingStatus.CONFIRMED)
+    private val slot = TimeSlot(soon(7200), soon(18000))
+    private val booking = Booking(5, long, soon(3600), soon(10800), 1500, BookingStatus.CONFIRMED)
 
     private fun render(name: String, scale: Float, content: @androidx.compose.runtime.Composable () -> Unit) {
         rule.setContent {
@@ -89,6 +89,6 @@ class FontScaleTest {
     }
 
     @Test fun myBookings() = both("bookings", { rule.onNodeWithTag("booking_card_5").assertIsDisplayed() }) {
-        MyBookingsContent(BookingsState(content = UiState.Content(listOf(booking)), now = Instant.now()), SnackbarHostState(), {}, {}, {}, showDebugMenu = false)
+        MyBookingsContent(BookingsState(content = UiState.Content(listOf(booking)), now = Clock.System.now()), SnackbarHostState(), {}, {}, {}, showDebugMenu = false)
     }
 }

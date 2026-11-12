@@ -6,7 +6,7 @@ Browse cars in a city, pick a time slot, book, and see/cancel your bookings. A n
 |---|---|
 | Live API docs | https://sawari-api-1krd.onrender.com/docs (Render free tier: the first request after idle can take ~30 s) |
 | Debug APK | built by CI on every push, attached to the GitHub release on `v*` tags |
-| Tests | 44 JVM unit tests + 6 emulator UI tests + 10 backend tests (60) |
+| Tests | 95 JVM tests (72 app + 23 shared) + 49 emulator tests + 10 backend tests. The 23 shared tests also run on the iOS simulator in CI. Counts are from the last full run, see Tests |
 
 <p>
 <img src="docs/screenshots/01_login.png" width="150"> <img src="docs/screenshots/03_car_list.png" width="150"> <img src="docs/screenshots/05_booking.png" width="150"> <img src="docs/screenshots/07_conflict.png" width="150"> <img src="docs/screenshots/06_my_bookings.png" width="150"> <img src="docs/screenshots/10_offline_cars.png" width="150">
@@ -100,7 +100,7 @@ Events sent: `search`, `booking_created`, `booking_conflict`, `booking_cancelled
 | Room DAO tests | 5 | filters, atomic `replaceAll`, ordering, embedded car |
 | Compose UI tests | 6 | run on the emulator (`androidTest`) |
 
-(The JVM rows add up to 44: 22 ViewModel + 17 network/repository + 5 DAO.)
+(That table is the original 60-test baseline. Counts now: **JVM 95** = 72 in `app` + 23 in `shared/commonTest`; **emulator 49** = deep links 4, reminders 8, permission flow 6, licence scan 3, animations 7, Compose/accessibility 11, font scale 5, reading order 5; **backend 10** (not re-run locally for this branch; green in CI). The emulator tests need a fresh install for the permission-denial tests. Lint: 0 errors, 99 warnings.)
 
 ### Mutation checks (done once each, both caught)
 - **Overlap check:** removed the exclusion-constraint DDL: `test_overlap_rejected_but_adjacent_and_other_car_allowed` and `test_concurrent_double_booking_only_one_wins` failed (2 failed, 8 passed). Restored.
@@ -147,6 +147,89 @@ Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-
 ## Deploying the backend (Render)
 `render.yaml` is a Blueprint: a Docker web service (`backend/Dockerfile`) plus a free Postgres, with `DATABASE_URL` wired in and a generated `JWT_SECRET`. In Render: *New → Blueprint → pick this repo*. The public docs URL will be `https://<service>.onrender.com/docs`. Deployed at https://sawari-api-1krd.onrender.com. I curl-tested the live service: `/health`, 24 cars in 3 cities, register, book, the same booking again (`409`), cancel.
 
+## Deep links
+| Link | Opens |
+|---|---|
+| `sawari://car/{id}` | that car's detail screen |
+| `sawari://bookings` | My bookings tab |
+| `https://sawari-api-1krd.onrender.com/app/car/{id}` and `/app/bookings` | same, as plain (unverified) https links |
+
+How it works: `MainActivity` is `singleTask`, so a link reaches an already-open app through `onNewIntent` and a closed app through `onCreate`. `DeepLinkParser` (pure Kotlin) turns the URI into `OpenCar` / `OpenBookings` / `Invalid`; the result waits in `MainViewModel`, so a **logged-out user signs in first and then lands on the target**. A car id that does not exist shows "Car not found" (the detail screen refreshes the cache first, so a cold start on an empty cache does not falsely say "not found"; offline it says it cannot load). A malformed link (`sawari://car/abc`) shows a snackbar and never crashes.
+
+Try it on an emulator (debug build, `adb` on PATH):
+```bash
+adb shell am start -a android.intent.action.VIEW -d "sawari://car/12" com.hxrsh.sawari
+adb shell am start -a android.intent.action.VIEW -d "sawari://bookings" com.hxrsh.sawari
+adb shell am start -a android.intent.action.VIEW -d "https://sawari-api-1krd.onrender.com/app/car/12" com.hxrsh.sawari
+```
+`bash scripts/deeplink_check.sh` runs the whole matrix against a local backend (cold start logged out then login, app already open, unknown id, malformed link, https link, cold start logged in) and prints PASS/FAIL. Last run: 8 of 8 PASS on an API 34 emulator.
+
+Tests: `DeepLinkParserTest` + `DeepLinkFlowTest` (JVM, 10 tests: a 28-row table of valid, broken and foreign URIs, pending link kept across login, unknown / empty-cache / offline car detail) and `DeepLinkIntentTest` (emulator, 4 tests: the manifest routes the custom-scheme and https URIs to `MainActivity`, does not claim foreign URIs, and a cold start with valid / unknown / malformed links does not crash).
+
+**Honest limits:** the https links are *not* verified App Links. That needs `https://sawari-api-1krd.onrender.com/.well-known/assetlinks.json` hosted with the app's signing fingerprint, which is not set up, so on a real phone Android may show a chooser instead of opening the app directly. The `onNewIntent` path (app already open) is verified with adb only; `ActivityScenario` cannot reliably close a `singleTask` activity, so there is no instrumented test for it.
+
+## Booking reminders and the notification permission
+A confirmed booking schedules a local notification **1 hour before it starts** (WorkManager, no server, no Firebase). Cancelling the booking cancels the reminder. Tapping the notification opens My bookings through the same deep link as `sawari://bookings`.
+
+- **Rule (`ReminderPlanner`, pure Kotlin):** fire at `start - 1h`. A booking that starts in less than an hour gets **no** reminder (a "starts in 1 hour" message would be false). Tested with fake clocks.
+- **Wiring:** `CreateBookingUseCase` / `CancelBookingUseCase` call a `ReminderScheduler` (interface in `domain`, WorkManager implementation in `notifications`). A failed booking or failed cancel changes nothing.
+- **Channel:** `booking_reminders`, created lazily (when the user taps through the explanation, or when a reminder is shown), not at app start, so nothing can trigger a notification prompt before the explain-first step. This is a precaution; I did not observe the system doing so. The unsolicited prompt I did see on the emulator came from LeakCanary in the debug build.
+- **Android 13+ permission (`POST_NOTIFICATIONS`)** is handled on the booking screen by a reusable `PermissionController` with four states: *not asked* (explain first, in a dialog, then ask), *denied once* ("Ask again"), *denied permanently* ("Open settings", which opens the app's system settings page; the state refreshes when you come back), and *granted*. Android cannot tell "never asked" from "don't ask again", so the app remembers whether it has asked. Booking works in every state; only the reminder depends on the permission. Before Android 13 there is no runtime permission, so only the "blocked in settings" state applies.
+
+Tests: 14 JVM tests (`ReminderPlannerTest`: 7 fake-clock cases; `ReminderUseCaseTest`: 6; `PermissionStatusTest`: every state combination) and 14 emulator tests (`ReminderInstrumentedTest`: real WorkManager enqueue / cancel / replace / skip, the notification posted by the worker, the notification's tap intent delivering `sawari://bookings` to `MainActivity`; `PermissionFlowTest`: the **real system permission dialog** driven with UiAutomator, deny, ask again, deny again, ends at "Open settings" with a quiet no-op when showing a reminder, the granted state, each card state, rationale-before-request, and booking still working with notifications denied).
+
+**Honest limits:** nothing waited a real hour: the clock is faked and the worker is run directly. The "denied" emulator test needs the permission to start un-granted (fresh install; the tests run in name order and skip, not pass, if it is already granted) and needs Android 13+. The system dialog buttons are found by id or by text ("Don't allow"), so another Android version or a localized emulator could need a tweak. Reminders are not re-scheduled after a reboot beyond what WorkManager persists, are not reconciled with bookings cancelled from another device, and are not cancelled on logout. The notification channel's behaviour on OEM skins with aggressive battery savers is not tested.
+
+## Driving licence photo (camera, on-device only)
+The booking screen has an optional **Scan driving licence** card: explain, ask for the camera, live CameraX preview, take photo, review, **Retake** or **Use photo**. The confirmed photo's *path* becomes part of the booking *draft*. It is not uploaded, not verified (no OCR, no ID check) and is deleted when you remove it, when the booking succeeds, or when you leave the booking screen. It lives in app-private storage (`filesDir/licence`).
+
+- **Permission:** same reusable controller as the reminders (not asked, denied once, don't-ask-again with an "Open settings" button). If the camera is refused, the **system photo picker** (no permission needed) is offered as a fallback.
+- **State machine:** `ScanState.on(event)` is a pure function (Preview, Capturing, Review, Done, Cancelled). A double tap on the shutter, a late camera callback after Retake, or Confirm with no photo are ignored.
+- **Camera lifecycle:** CameraX is bound to the lifecycle in a `DisposableEffect` and unbound on leave; the shutter stays disabled until the camera is really bound. Only the back camera is configured (`CameraXConfig` limiter), which also fixes CameraX refusing to start on devices that declare a front camera they do not have (the stock emulator does).
+- **Bugs the real-app check found and I fixed:** (1) tapping the shutter before the camera was ready failed the capture; (2) after **Use photo** the app silently re-opened the camera while closing the scanner and kept holding it on the booking screen (a late CameraX bind callback ran after the preview was gone). Both are covered now.
+
+Verified on the emulator (its virtual back camera): `bash scripts/licence_check.sh` drives the real debug app and checks, among others, that the rationale shows before the system dialog, the camera is in use only while previewing, the preview and the review survive rotation, exactly one photo exists after a capture, a retaken photo is deleted, the camera is released while reviewing and after confirming, Back closes the scanner, and that **LeakCanary** (debug build) did not dump the heap or report a leak after repeated open/close of the scanner. Tests: 16 JVM (state-machine table, file deletion on retake / cancel / replace, picker import, draft lifecycle) and 3 emulator tests (the real camera permission dialogs: deny, ask again, deny, "Open settings" + picker fallback; a real capture, retake, confirm with the files checked on disk).
+
+**Honest limits:** the emulator camera is a synthetic scene, so image quality, autofocus and real-device camera quirks are untested. The photo picker fallback is shown but I could not drive the system picker UI, so picking a photo is covered by unit tests of the import path only. LeakCanary only proves no leak on the paths I exercised. The photo file is not encrypted. Debug builds include LeakCanary, which shows its own notification-permission dialog on Android 13+ (the check script pre-grants it); release builds do not.
+
+## Animations (and reduced motion)
+- **Car list:** a skeleton with a shimmer replaces the spinner while loading (still announced once as "Loading"); cards fade and slide up the first time they appear (new ids only, not when scrolling back); `animateItem()` slides cards to their new place when a filter reorders the list.
+- **Booking summary:** the card animates its size, and the total rolls up or down when the duration changes (`AnimatedContent`).
+- **Reduced motion:** if the user turned animations off (Developer options "Animator duration scale: off", which "Remove animations" also sets), `LocalReduceMotion` is true: no shimmer (a static placeholder), no enter transition, and the total is a plain `Text` with no `AnimatedContent`. The app follows the setting live (`ContentObserver`). Tested with the real system setting.
+- **Why a wrapper composable and not a `Modifier` for the enter animation:** a modifier created inside the list item would make every `CarCard` recompose when the animation starts. The wrapper keeps the animation state in its own scope and applies progress in the graphics layer (draw phase).
+
+**Accessibility re-checked after the change** (emulator): the automated Compose accessibility checks, the 200% font-scale tests, the reading-order tests and the 48 dp touch-target assertions all pass. One test had to change: the booking screen got taller (licence card), so the confirm button starts below the fold and a partly visible node reports a clipped touch area; the test now scrolls it into view before measuring, as a user would. No layout or size was weakened.
+
+**Recomposition re-measured** with the method from the Performance section (Macrobenchmark `ListBenchmark.filterToggleOptimised`, `CarCard` trace section, same AVD, 5 iterations, baseline = the commit before these changes, built and run the same way):
+
+| | Before | After |
+|---|---|---|
+| Card bodies run in the 4-step city-filter toggle | 7 (7,7,7,7,7) | **7** (7,7,7,7,7) |
+| Summed time in `CarCard` composition, median (range) | 21.0 ms (11.8 to 53.2) | 56.2 ms (30.1 to 71.7) |
+
+The count did not change. The time did look higher, but the ranges overlap and this emulator is noisy, so I do not claim either "no cost" or "a cost". Frame time and jank were **not** re-measured.
+
+Tests: 1 JVM test for the reduce-motion rule and 7 emulator tests (skeleton and its announcement, with and without reduced motion; cards appear and stay clickable; the total ends on the right price and, with reduced motion, has no outgoing copy; the real system animator setting is detected and followed live).
+
+**Honest limits:** I judged the animations by tests and by the screens I looked at on the emulator, not on a real device; smoothness is not measured. Enter animations replay when the list is rebuilt from scratch (new composition).
+
+## Shared Kotlin Multiplatform module (Android + iOS targets)
+`shared/` is a Kotlin Multiplatform library (targets `androidTarget`, `iosX64`, `iosArm64`, `iosSimulatorArm64`) holding the parts of the domain layer that are genuinely platform-independent: the models, `AppResult` / `AppError`, the use cases, the repository **interfaces**, `ReminderScheduler` / `ReminderPlanner`. The Android app depends on it; its package names did not change.
+
+What stayed in `app/` on purpose: Room, Retrofit/OkHttp, DataStore, WorkManager, CameraX, Compose, Hilt wiring and all ViewModels (they use Android `ViewModel`, `SavedStateHandle`, Compose types).
+
+What had to change to make the move honest:
+- **Dates:** `java.time.Instant` is JVM-only, so the models use `kotlinx.datetime.Instant`; the app converts at its edges (mappers, formatters, ViewModels).
+- **`@Immutable`:** it comes from Compose, which a shared module must not depend on. The app marks `com.hxrsh.sawari.domain.model.*` stable in `app/compose_stability.conf` instead. Re-measured: the card recomposition count in the filter-toggle benchmark is still 7 (5 of 5 runs).
+- **`@Inject`:** `javax.inject` is JVM-only, so the use cases are plain classes and `di/UseCaseModule.kt` builds them for Hilt.
+- **`expect/actual` (one real case): `AppLog`.** Android logs with `android.util.Log`, iOS with `NSLog`; neither exists on the other platform. Dates did not need `expect/actual` because kotlinx-datetime already covers them in common code. The first iOS run caught a real bug here: passing Kotlin strings to `NSLog` as `%@` varargs crashed the iOS test process; the actual now passes one escaped format string.
+
+**What is verified (and how):**
+- `:shared:testDebugUnitTest` runs the 23 `commonTest` tests on the JVM/Android target (locally and in CI): reminder rule, booking model, `AppResult`, create/cancel/auth use cases with hand-written fakes.
+- The CI job **`shared-ios`** (`macos-latest`) runs `./gradlew :shared:iosSimulatorArm64Test` and `:shared:linkDebugFrameworkIosSimulatorArm64`. Its last run on this branch was green: **23 tests ran on the iOS simulator, 0 failed**, and `SawariShared.framework` was produced (the job prints the totals from the test result files). That job is the only evidence for iOS; I have no Mac, so nothing iOS was run locally.
+
+**Honest limits:** there is **no iOS app**: no SwiftUI, no Compose Multiplatform UI, no Xcode project. The framework is built but nothing consumes it, so "the shared module compiles and its tests pass on iOS" is the whole claim. `iosX64` and `iosArm64` are declared but CI only builds and tests `iosSimulatorArm64`. The shared module has no networking or persistence, so an iOS client would still need those. Kotlin/Native compile warnings about expect/actual being in Beta are not suppressed.
+
 ## Quality
 | Area | Status | Where |
 |---|---|---|
@@ -156,7 +239,7 @@ Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-
 | Device / OS-version matrix | **Not run.** Only an Android 14 emulator has been used | n/a |
 
 ## Future scope
-- **iOS (SwiftUI) client**, not started. The architecture was kept portable on purpose: the FastAPI backend is client-agnostic, the domain layer (models, `AppResult`/`AppError`, use cases) has no Android types, and the unidirectional-state ViewModels map onto SwiftUI view models (`@Observable`, `async/await` in place of `Flow`, SwiftData/Core Data in place of Room as the offline source of truth). Needs a Mac to build.
+- **iOS client**, not started. What exists: the `shared` KMP module (domain layer) with a green iOS simulator test run in CI (see above). Still needed: networking, persistence (a Room/SQLDelight equivalent) and the UI (SwiftUI or Compose Multiplatform), and a Mac to build and run it.
 - Crashlytics end-to-end verification against a real Firebase project, a Figma-to-Compose design pass, and a real-device / multi-OS-version test matrix (see the Quality table above).
 - Encrypted token storage, pagination, and real payments.
 
@@ -167,5 +250,5 @@ Then `./gradlew :app:bundleFirebaseRelease -Psawari.releaseBaseUrl=https://YOUR-
 - **Firebase Crashlytics/Analytics are integrated and compile, but I never saw an event or crash in a Firebase console** (no Firebase project is available to me). The `firebase` flavour is therefore unverified end to end.
 - **All performance numbers are from an emulator**, not a physical device, and the frame-time results are inconclusive (see above). Start-up numbers are noisy (6 iterations).
 - Auth token is stored in plain DataStore (not encrypted); fine for a demo, not for production.
-- No push notifications, no pagination (24 cars), no payment/ID verification, English only.
+- Only local reminder notifications (no push, no server-sent notifications), no pagination (24 cars), no payment/ID verification, English only.
 - Play Store: listing assets prepared, **not published**; feature graphic and 512x512 store icon still to make.

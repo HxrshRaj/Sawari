@@ -49,6 +49,8 @@ jobs:
         run: ./gradlew :app:lintLiteDebug
       - name: Unit tests (ViewModels, MockWebServer, Robolectric Room)
         run: ./gradlew :app:testLiteDebugUnitTest
+      - name: Shared module tests (commonTest on the Android/JVM target)
+        run: ./gradlew :shared:testDebugUnitTest
       - name: Assemble debug APK
         run: ./gradlew :app:assembleLiteDebug
       - uses: actions/upload-artifact@v4
@@ -62,6 +64,37 @@ jobs:
           path: |
             app/build/reports/lint-results-liteDebug.html
             app/build/reports/tests/testLiteDebugUnitTest
+
+  # Proves the shared Kotlin Multiplatform module really builds and tests for iOS. Needs a Mac: Kotlin/Native for Apple
+  # targets only builds on macOS. This is the ONLY evidence for any iOS claim in the README.
+  shared-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Shared tests on the iOS simulator
+        run: ./gradlew :shared:iosSimulatorArm64Test
+      - name: Print the iOS test totals
+        run: |
+          python3 - <<'PY'
+          import glob, re
+          total = failed = 0
+          for p in glob.glob("shared/build/test-results/iosSimulatorArm64Test/*.xml"):
+              m = re.search(r'tests="(\d+)" skipped="(\d+)" failures="(\d+)" errors="(\d+)"', open(p).read(2000))
+              t, s, f, e = map(int, m.groups())
+              total += t; failed += f + e
+              print(p.split("/")[-1], "tests", t, "failed", f + e)
+          print("iOS simulator tests:", total, "failed:", failed)
+          assert total > 0 and failed == 0
+          PY
+      - name: Build the iOS framework
+        run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64
+      - name: Show what was produced
+        run: ls -la shared/build/bin/iosSimulatorArm64/debugFramework
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

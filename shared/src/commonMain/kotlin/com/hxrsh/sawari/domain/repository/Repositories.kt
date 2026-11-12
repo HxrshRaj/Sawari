@@ -7,7 +7,7 @@ import com.hxrsh.sawari.domain.model.CarFilter
 import com.hxrsh.sawari.domain.model.Session
 import com.hxrsh.sawari.domain.model.TimeSlot
 import kotlinx.coroutines.flow.Flow
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 interface AuthRepository {
     val session: Flow<Session?>

@@ -25,7 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /** Repository + real Room (in-memory, via Robolectric) + real Retrofit against MockWebServer. */
 @RunWith(AndroidJUnit4::class)

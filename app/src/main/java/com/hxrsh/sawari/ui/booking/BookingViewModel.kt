@@ -11,6 +11,7 @@ import com.hxrsh.sawari.domain.userMessage
 import com.hxrsh.sawari.domain.usecase.CreateBookingUseCase
 import com.hxrsh.sawari.domain.usecase.GetBusySlotsUseCase
 import com.hxrsh.sawari.domain.usecase.ObserveCarUseCase
+import com.hxrsh.sawari.ui.licence.LicencePhotoStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinInstant
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -33,6 +35,7 @@ class BookingViewModel @Inject constructor(
     observeCar: ObserveCarUseCase,
     private val getBusySlots: GetBusySlotsUseCase,
     private val createBooking: CreateBookingUseCase,
+    private val licencePhotos: LicencePhotoStore,
     private val analytics: Analytics,
     private val clock: Clock,
 ) : ViewModel() {
@@ -62,6 +65,15 @@ class BookingViewModel @Inject constructor(
                 )
             }
             BookingIntent.DismissError -> _state.update { it.copy(error = null, conflict = false) }
+            is BookingIntent.AttachLicence -> {
+                // Replacing a photo deletes the old file.
+                _state.value.licencePhotoPath?.takeIf { it != intent.path }?.let(licencePhotos::delete)
+                _state.update { it.copy(licencePhotoPath = intent.path) }
+            }
+            BookingIntent.RemoveLicence -> {
+                _state.value.licencePhotoPath?.let(licencePhotos::delete)
+                _state.update { it.copy(licencePhotoPath = null) }
+            }
             BookingIntent.Submit -> submit()
         }
     }
@@ -71,12 +83,14 @@ class BookingViewModel @Inject constructor(
         if (!s.canSubmit) return
         _state.update { it.copy(isSubmitting = true, error = null, conflict = false) }
         viewModelScope.launch {
-            val start = s.start.atZone(s.zone).toInstant()
-            val end = s.end.atZone(s.zone).toInstant()
-            when (val result = createBooking(carId, start, end, clock.instant())) {
+            val start = s.start.atZone(s.zone).toInstant().toKotlinInstant()
+            val end = s.end.atZone(s.zone).toInstant().toKotlinInstant()
+            when (val result = createBooking(carId, start, end, clock.instant().toKotlinInstant())) {
                 is AppResult.Success -> {
                     analytics.logEvent(Events.BOOKING_CREATED, mapOf("car_id" to carId.toString(), "hours" to s.durationHours.toString()))
-                    _state.update { it.copy(isSubmitting = false) }
+                    // The licence photo was only a draft attachment and is not uploaded: do not keep it around.
+                    s.licencePhotoPath?.let(licencePhotos::delete)
+                    _state.update { it.copy(isSubmitting = false, licencePhotoPath = null) }
                     _effects.send(BookingEffect.Booked(result.data))
                 }
                 is AppResult.Failure -> {
@@ -96,6 +110,11 @@ class BookingViewModel @Inject constructor(
         viewModelScope.launch {
             (getBusySlots(carId) as? AppResult.Success)?.let { r -> _state.update { it.copy(busy = r.data) } }
         }
+    }
+
+    override fun onCleared() {
+        // Leaving the booking screen discards the draft, including an attached licence photo.
+        _state.value.licencePhotoPath?.let(licencePhotos::delete)
     }
 
     private fun initialState(): BookingState {

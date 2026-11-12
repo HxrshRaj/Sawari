@@ -14,6 +14,8 @@ import com.hxrsh.sawari.domain.model.TimeSlot
 import com.hxrsh.sawari.domain.model.User
 import com.hxrsh.sawari.domain.repository.BookingRepository
 import com.hxrsh.sawari.domain.repository.CarRepository
+import com.hxrsh.sawari.domain.reminder.ReminderScheduler
+import com.hxrsh.sawari.ui.licence.LicencePhotoStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +31,8 @@ import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.hours
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule : TestWatcher() {
@@ -48,7 +51,12 @@ object Fixtures {
     val session = Session("tok", user)
 
     fun booking(id: Int, car: Car = swift, status: BookingStatus = BookingStatus.CONFIRMED, startHoursFromNow: Long = 2) =
-        Booking(id, car, Instant.now().plusSeconds(startHoursFromNow * 3600), Instant.now().plusSeconds((startHoursFromNow + 3) * 3600), car.pricePerHour * 3, status)
+        Booking(
+            id, car,
+            kotlinx.datetime.Clock.System.now() + startHoursFromNow.hours,
+            kotlinx.datetime.Clock.System.now() + (startHoursFromNow + 3).hours,
+            car.pricePerHour * 3, status,
+        )
 
     fun carJson(c: Car) =
         """{"id":${c.id},"name":"${c.name}","city":"${c.city}","price_per_hour":${c.pricePerHour},"image_url":"${c.imageUrl}","seats":${c.seats},"fuel":"${c.fuel}"}"""
@@ -132,3 +140,20 @@ fun testApi(server: MockWebServer, client: okhttp3.OkHttpClient = okhttp3.OkHttp
         .addConverterFactory(Json { ignoreUnknownKeys = true }.asConverterFactory("application/json".toMediaType()))
         .build()
         .create(SawariApi::class.java)
+
+class FakeReminderScheduler : ReminderScheduler {
+    val scheduled = mutableListOf<Booking>()
+    val cancelled = mutableListOf<Int>()
+    override fun schedule(booking: Booking) { scheduled += booking }
+    override fun cancel(bookingId: Int) { cancelled += bookingId }
+}
+
+class FakeLicencePhotoStore : LicencePhotoStore {
+    val existing = mutableSetOf<String>()
+    private var counter = 0
+    var importFails = false
+    override fun newFile(): java.io.File = java.io.File("/fake/licence-${++counter}.jpg").also { existing += it.path }
+    override fun delete(path: String) { existing -= path }
+    override suspend fun importFrom(open: () -> java.io.InputStream?): String? =
+        if (importFails || open() == null) null else java.io.File("/fake/picked-${++counter}.jpg").path.also { existing += it }
+}

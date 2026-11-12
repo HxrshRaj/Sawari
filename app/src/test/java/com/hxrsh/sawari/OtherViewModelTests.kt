@@ -84,7 +84,7 @@ class MyBookingsViewModelTest {
     private val repo = FakeBookingRepository()
     private val analytics = FakeAnalytics()
     private fun vm() = MyBookingsViewModel(
-        ObserveBookingsUseCase(repo), RefreshBookingsUseCase(repo), CancelBookingUseCase(repo),
+        ObserveBookingsUseCase(repo), RefreshBookingsUseCase(repo), CancelBookingUseCase(repo, FakeReminderScheduler()),
         LogoutUseCase(FakeAuthRepository()), analytics, Clock.systemUTC(),
     )
 

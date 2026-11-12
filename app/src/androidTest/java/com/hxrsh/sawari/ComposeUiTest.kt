@@ -26,6 +26,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.hxrsh.sawari.domain.model.Booking
@@ -44,7 +45,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.Instant
+import kotlinx.datetime.Clock
 
 @RunWith(AndroidJUnit4::class)
 class ComposeUiTest {
@@ -105,7 +106,7 @@ class ComposeUiTest {
     }
 
     @Test fun bookingCard_cancelButtonOnlyWhenCancellable() {
-        val booking = Booking(5, swift, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 540, BookingStatus.CONFIRMED)
+        val booking = Booking(5, swift, soon(3600), soon(10800), 540, BookingStatus.CONFIRMED)
         var cancelRequests = 0
         rule.setContent {
             SawariTheme {
@@ -126,8 +127,8 @@ class ComposeUiTest {
     // plus explicit assertions. Runs the same checks on every screen.
     // ---------------------------------------------------------------------------------------------
 
-    private val busy = listOf(TimeSlot(Instant.now().plusSeconds(7200), Instant.now().plusSeconds(18000)))
-    private val upcoming = Booking(5, swift, Instant.now().plusSeconds(3600), Instant.now().plusSeconds(10800), 540, BookingStatus.CONFIRMED)
+    private val busy = listOf(TimeSlot(soon(7200), soon(18000)))
+    private val upcoming = Booking(5, swift, soon(3600), soon(10800), 540, BookingStatus.CONFIRMED)
 
     /** Real touch-target check: Material widgets enlarge their touch area beyond their layout bounds, so measure that. */
     private fun assertTargets(vararg tags: String) {
@@ -171,13 +172,17 @@ class ComposeUiTest {
         rule.onNodeWithContentDescription("Fewer hours").assertIsDisplayed()
         rule.onNodeWithContentDescription("More hours").assertIsDisplayed()
         rule.onNode(isHeading() and hasText("When do you need it?")).assertExists()
-        assertTargets("back_button", "pick_date", "pick_time", "duration_minus", "duration_plus", "confirm_button")
+        assertTargets("back_button", "pick_date", "pick_time", "duration_minus", "duration_plus")
+        // The screen scrolls and the licence card made it taller: the confirm button now starts below the fold, and a
+        // partly visible node reports a clipped touch area, so scroll it into view like a user would before measuring.
+        rule.onNodeWithTag("confirm_button").performScrollTo()
+        assertTargets("confirm_button")
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun a11y_myBookings() {
         rule.enableAccessibilityChecks()
-        val state = BookingsState(content = UiState.Content(listOf(upcoming, upcoming.copy(id = 6, status = BookingStatus.CANCELLED))), now = Instant.now())
+        val state = BookingsState(content = UiState.Content(listOf(upcoming, upcoming.copy(id = 6, status = BookingStatus.CANCELLED))), now = Clock.System.now())
         rule.setContent {
             SawariTheme { MyBookingsContent(state, androidx.compose.material3.SnackbarHostState(), {}, {}, {}, showDebugMenu = false) }
         }

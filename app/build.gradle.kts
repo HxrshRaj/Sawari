@@ -112,7 +112,12 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+composeCompiler {
+    stabilityConfigurationFile = layout.projectDirectory.file("compose_stability.conf")
+}
+
 dependencies {
+    implementation(project(":shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.splash)
     implementation(libs.androidx.activity.compose)
@@ -120,6 +125,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     implementation(libs.androidx.profileinstaller)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -167,5 +177,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.accessibility)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.androidx.test.uiautomator)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

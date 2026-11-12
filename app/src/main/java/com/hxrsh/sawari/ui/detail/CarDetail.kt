@@ -40,6 +40,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import com.hxrsh.sawari.domain.AppResult
+import com.hxrsh.sawari.domain.AppError
+import com.hxrsh.sawari.domain.userMessage
+import com.hxrsh.sawari.domain.usecase.RefreshCarsUseCase
 import com.hxrsh.sawari.domain.model.Car
 import com.hxrsh.sawari.domain.model.TimeSlot
 import com.hxrsh.sawari.domain.usecase.GetBusySlotsUseCase
@@ -68,15 +71,26 @@ class CarDetailViewModel @Inject constructor(
     savedState: SavedStateHandle,
     observeCar: ObserveCarUseCase,
     private val getBusySlots: GetBusySlotsUseCase,
+    private val refreshCars: RefreshCarsUseCase,
 ) : ViewModel() {
     private val carId: Int = checkNotNull(savedState["carId"])
     private val busy = MutableStateFlow<List<TimeSlot>>(emptyList())
 
-    val state: StateFlow<CarDetailState> = combine(observeCar(carId), busy) { car, busy ->
-        CarDetailState(if (car == null) UiState.Empty else UiState.Content(car), busy)
+    /** Null while the first refresh runs, then its outcome. Needed for deep links that land on an empty cache. */
+    private val refreshOutcome = MutableStateFlow<AppResult<Unit>?>(null)
+
+    val state: StateFlow<CarDetailState> = combine(observeCar(carId), busy, refreshOutcome) { car, busy, outcome ->
+        val ui = when {
+            car != null -> UiState.Content(car)
+            outcome == null -> UiState.Loading // cache may just be empty (cold start from a link): no false "not found"
+            outcome is AppResult.Failure && outcome.error is AppError.Network -> UiState.Error(outcome.error.userMessage())
+            else -> UiState.Empty // refreshed fine and the id still does not exist: unknown car
+        }
+        CarDetailState(ui, busy)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CarDetailState())
 
     init {
+        viewModelScope.launch { refreshOutcome.value = refreshCars() }
         viewModelScope.launch {
             // Best effort: offline we simply don't show the "already booked" list.
             (getBusySlots(carId) as? AppResult.Success)?.let { busy.value = it.data }
@@ -108,7 +122,8 @@ fun CarDetailContent(state: CarDetailState, onBack: () -> Unit, onBook: (Int) ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             when (val car = state.car) {
                 UiState.Loading -> LoadingState()
-                UiState.Empty, is UiState.Error -> EmptyState("Car not found", "It may have been removed.")
+                UiState.Empty -> EmptyState("Car not found", "It may have been removed.")
+                is UiState.Error -> EmptyState("Can't load this car", car.message)
                 is UiState.Content -> DetailBody(car.data, state.busy, onBook)
             }
         }

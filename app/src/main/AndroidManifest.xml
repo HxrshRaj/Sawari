@@ -3,6 +3,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Android 13+: asked at runtime, with an explanation, from the booking screen. Booking works without it. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Only to photograph the driving licence on the booking screen; asked at runtime with an explanation. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Not required: without a camera the app still installs and offers the photo picker. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:name=".SawariApp"
@@ -17,10 +23,34 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Custom scheme: sawari://car/{id} and sawari://bookings -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sawari" android:host="car" />
+                <data android:scheme="sawari" android:host="bookings" />
+            </intent-filter>
+
+            <!--
+              https equivalent: https://sawari-api-1krd.onrender.com/app/car/{id} and /app/bookings.
+              NOT autoVerify: verified App Links need a hosted /.well-known/assetlinks.json on that host,
+              which is not set up. Until then Android shows the "open with" chooser for these links.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="sawari-api-1krd.onrender.com" />
+                <data android:pathPrefix="/app/car" />
+                <data android:pathPrefix="/app/bookings" />
             </intent-filter>
         </activity>
     </application>

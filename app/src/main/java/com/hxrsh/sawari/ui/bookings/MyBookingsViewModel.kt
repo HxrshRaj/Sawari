@@ -27,7 +27,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlinx.datetime.toKotlinInstant
 import javax.inject.Inject
 
 @Immutable
@@ -36,7 +37,7 @@ data class BookingsState(
     val isRefreshing: Boolean = false,
     val staleNotice: String? = null,
     val cancellingId: Int? = null,
-    val now: Instant = Instant.EPOCH,
+    val now: Instant = Instant.fromEpochMilliseconds(0),
 )
 
 @Immutable
@@ -70,7 +71,7 @@ class MyBookingsViewModel @Inject constructor(
             isRefreshing = r.inFlight,
             staleNotice = if (bookings.isNotEmpty()) r.error?.let(::notice) else null,
             cancellingId = cancellingId,
-            now = clock.instant(),
+            now = clock.instant().toKotlinInstant(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookingsState())
 
